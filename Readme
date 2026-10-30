@@ -49,3 +49,8 @@ Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
                     `docker compose down -v && docker compose up -d`
 - Reconstruir la app tras cambiar el código o requirements:
                     `docker compose up -d --build`
+
+
+##Layer_003
+
+1. Inicio de sesion 
