@@ -1,0 +1,51 @@
+# Proyecto
+
+## Puesta en marcha (para quien clona el repositorio)
+
+1. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+2. Copiar `.env.example` a `.env` (puedes dejar los valores tal cual en desarrollo).
+3. Levantar la base de datos:  `docker compose up -d`
+4. Instalar dependencias:  `pip install -r requirements.txt`
+5. Ejecutar la app:  `python app.py`
+
+Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
+
+## Comandos útiles
+
+- Ver estado:            `docker compose ps`
+- Apagar:                `docker compose down`
+- Reiniciar la BD desde cero (borra datos y vuelve a correr los scripts):
+                         `docker compose down -v && docker compose up -d`
+
+## Cambiar la estructura de la BD
+Edita/agrega archivos en `db/init/` (ej. `03_nueva_tabla.sql`), haz commit,
+y cada colaborador corre el comando de "reiniciar desde cero".
+
+
+## Layer 002
+
+
+## Opción A: todo con Docker (app + base de datos)
+
+1. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+2. Copiar `.env.example` a `.env`.
+3. `docker compose up -d --build`
+4. Abrir http://localhost:5000
+
+## Opción B: app en tu máquina, solo la BD en Docker
+
+1. `docker compose up -d db`
+2. `pip install -r requirements.txt`
+3. `python app.py`   (con `DB_HOST=localhost` en tu `.env`)
+
+Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
+
+## Comandos útiles
+
+- Ver estado:       `docker compose ps`
+- Ver logs:         `docker compose logs -f web`
+- Apagar:           `docker compose down`
+- Reiniciar la BD desde cero (borra datos y re-ejecuta `db/init/`):
+                    `docker compose down -v && docker compose up -d`
+- Reconstruir la app tras cambiar el código o requirements:
+                    `docker compose up -d --build`

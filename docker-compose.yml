@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16
+    container_name: proyecto_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data            # datos reales (NO van a Git)
+      - ./db/init:/docker-entrypoint-initdb.d:ro   # tablas y datos (SÍ van a Git)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    container_name: proyecto_web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db      # dentro de Docker la BD se llama "db", no "localhost"
+      DB_PORT: 5432    # puerto interno del contenedor
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy   # espera a que Postgres esté listo
+
+volumes:
+  pgdata:
