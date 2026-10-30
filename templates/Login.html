@@ -1,42 +1,81 @@
+{% from '_iconos.html' import icono %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Iniciar sesión</title>
-  <style>
-    body { font-family: system-ui, sans-serif; background: #f3f4f6; display: grid; place-items: center; min-height: 100vh; margin: 0; }
-    .card { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.08); width: 100%; max-width: 360px; }
-    h1 { margin-top: 0; font-size: 1.4rem; }
-    label { display: block; margin: 1rem 0 .3rem; font-size: .9rem; }
-    select, input { width: 100%; padding: .6rem; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
-    button { width: 100%; margin-top: 1.5rem; padding: .7rem; border: 0; border-radius: 8px; background: #4f46e5; color: #fff; font-size: 1rem; cursor: pointer; }
-    .error { background: #fee2e2; color: #991b1b; padding: .6rem; border-radius: 8px; margin-bottom: 1rem; font-size: .9rem; }
-  </style>
+  <title>Iniciar sesión | Actas SENA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
-  <form class="card" method="post">
-    <h1>Iniciar sesión</h1>
+<body class="pagina-login">
+  <main class="login">
 
-    {% with mensajes = get_flashed_messages() %}
-      {% for m in mensajes %}<div class="error">{{ m }}</div>{% endfor %}
-    {% endwith %}
 
-    <label for="tipo_documento">Tipo de documento</label>
-    <select id="tipo_documento" name="tipo_documento" required>
-      <option value="" disabled selected>Selecciona una opción</option>
-      {% for t in tipos_documento %}
-        <option value="{{ t.id }}">{{ t.nombre }}</option>
-      {% endfor %}
-    </select>
+    <aside class="login-marca">
+      <div class="marca-contenido">
+        <img class="marca-logo" src="{{ url_for('static', filename='img/logo-sena.png') }}" alt=""
+             onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+        <span class="marca-logo-texto" hidden>SENA</span>
+        <h1>Actas SENA</h1>
+        <hr>
+        <p>Gestiona, organiza y consulta<br>tus actas de forma rápida y segura.</p>
+      </div>
+      <div class="marca-foto" style="background-image: url('{{ url_for('static', filename='img/sede.jpg') }}')"></div>
+    </aside>
 
-    <label for="numero_documento">Número de documento</label>
-    <input id="numero_documento" name="numero_documento" type="text" inputmode="numeric" required>
 
-    <label for="password">Contraseña</label>
-    <input id="password" name="password" type="password" required>
+    <section class="login-form">
+      <div class="login-caja">
+        <h2>Iniciar sesión</h2>
+        <p class="login-sub">Ingresa con tu cuenta del SENA</p>
 
-    <button type="submit">Ingresar</button>
-  </form>
+
+        <form class="tarjeta-form" method="post" action="{{ url_for('login') }}" novalidate>
+
+
+          {% with mensajes = get_flashed_messages() %}
+            {% if mensajes %}
+              <div class="alerta" role="alert">{{ mensajes[0] }}</div>
+            {% endif %}
+          {% endwith %}
+
+
+          <label for="correo">{{ icono('user') }} Correo institucional</label>
+          <input type="email" id="correo" name="correo" value="{{ correo }}"
+                 placeholder="usuario@misena.edu.co" autocomplete="email" required autofocus>
+
+
+          <label for="password">{{ icono('lock') }} Contraseña</label>
+          <div class="campo-clave">
+            <input type="password" id="password" name="password"
+                   placeholder="Ingresa tu contraseña" autocomplete="current-password" required>
+            <button type="button" class="ojo" aria-label="Mostrar contraseña" aria-pressed="false">
+              {{ icono('eye') }}
+            </button>
+          </div>
+
+
+          <button type="submit" class="btn-primario">Iniciar sesión</button>
+        </form>
+      </div>
+    </section>
+
+
+  </main>
+
+
+  <script>
+    const campo = document.getElementById('password');
+    const ojo = document.querySelector('.ojo');
+    ojo.addEventListener('click', () => {
+      const mostrar = campo.type === 'password';
+      campo.type = mostrar ? 'text' : 'password';
+      ojo.setAttribute('aria-pressed', mostrar);
+      ojo.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    });
+  </script>
 </body>
 </html>

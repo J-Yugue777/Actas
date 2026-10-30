@@ -1,0 +1,24 @@
+{# Iconos en línea. Uso: {% from '_iconos.html' import icono %}  {{ icono('home') }} #}
+{% macro icono(n) -%}
+<svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if n == 'home' %}<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>
+{%- elif n == 'file-plus' %}<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 12v6M9 15h6"/>
+{%- elif n == 'file-text' %}<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>
+{%- elif n == 'folder' %}<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+{%- elif n == 'users' %}<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 5a3.5 3.5 0 0 1 0 7M18 14c2.2.6 3.5 2.6 3.5 6"/>
+{%- elif n == 'clipboard' %}<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 14l2 2 4-4"/>
+{%- elif n == 'user-circle' %}<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.2-2.2 3.2-3 5.5-3s4.3.8 5.5 3"/>
+{%- elif n == 'user' %}<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>
+{%- elif n == 'chart' %}<path d="M5 20V10M12 20V4M19 20v-7"/>
+{%- elif n == 'sliders' %}<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>
+{%- elif n == 'logout' %}<path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M15 8l4 4-4 4M19 12H9"/>
+{%- elif n == 'eye' %}<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>
+{%- elif n == 'check-circle' %}<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>
+{%- elif n == 'x-circle' %}<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>
+{%- elif n == 'clock' %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{%- elif n == 'bell' %}<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>
+{%- elif n == 'lock' %}<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+{%- elif n == 'chevron' %}<path d="M6 9l6 6 6-6"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}

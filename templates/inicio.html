@@ -1,0 +1,154 @@
+{% from '_iconos.html' import icono %}
+{#
+  DATOS DE EJEMPLO: las tarjetas, la tabla de actas y los compromisos son de muestra
+  hasta que existan las tablas de actas en la base de datos. Solo nombre, rol y
+  tipo_vinculacion vienen de la sesión.
+#}
+{% set resumen = [
+  {'titulo': 'Total de actas', 'valor': 12, 'icono': 'file-text', 'color': 'verde'},
+  {'titulo': 'En revisión',    'valor': 3,  'icono': 'eye',        'color': 'azul'},
+  {'titulo': 'Aprobadas',      'valor': 8,  'icono': 'check-circle','color': 'verde'},
+  {'titulo': 'Rechazadas',     'valor': 1,  'icono': 'x-circle',   'color': 'rojo'}
+] %}
+{% set actas = [
+  {'num': '024', 'fecha': '10/05/2024', 'programa': 'Tecnólogo en Análisis y Desarrollo de Software', 'ficha': '2876540', 'estado': 'Aprobada',    'clase': 'verde'},
+  {'num': '023', 'fecha': '08/05/2024', 'programa': 'Técnico en Gestión Administrativa',              'ficha': '2876539', 'estado': 'En revisión', 'clase': 'azul'},
+  {'num': '022', 'fecha': '06/05/2024', 'programa': 'Tecnólogo en Gestión Logística',                 'ficha': '2876538', 'estado': 'Aprobada',    'clase': 'verde'},
+  {'num': '021', 'fecha': '03/05/2024', 'programa': 'Técnico en Sistemas',                            'ficha': '2876537', 'estado': 'Aprobada',    'clase': 'verde'},
+  {'num': '020', 'fecha': '30/04/2024', 'programa': 'Tecnólogo en Gestión Empresarial',               'ficha': '2876536', 'estado': 'Rechazada',   'clase': 'rojo'}
+] %}
+{% set compromisos = [
+  {'titulo': 'Entregar informe final',  'fecha': '15/05/2024', 'estado': 'Pendiente',  'clase': 'amarillo', 'icono': 'clock',     'color': 'amarillo'},
+  {'titulo': 'Revisar documento',       'fecha': '18/05/2024', 'estado': 'Completado', 'clase': 'verde',    'icono': 'file-text', 'color': 'azul'},
+  {'titulo': 'Presentación de resultados','fecha': '22/05/2024','estado': 'Pendiente', 'clase': 'amarillo', 'icono': 'chart',     'color': 'morado'}
+] %}
+{% set partes = nombre.split() %}
+{% set iniciales = (partes[0][0] ~ (partes[-1][0] if partes|length > 1 else ''))|upper %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inicio | Actas SENA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="pagina-inicio">
+  <div class="app">
+
+
+    <aside class="lateral">
+      <div class="lateral-logo">
+        <img src="{{ url_for('static', filename='img/logo-sena.png') }}" alt=""
+             onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+        <span class="marca-logo-texto" hidden>SENA</span>
+      </div>
+
+
+      <nav class="menu" aria-label="Principal">
+        <a href="{{ url_for('inicio') }}" class="activo" aria-current="page">{{ icono('home') }} Inicio</a>
+        <a href="#">{{ icono('file-plus') }} Crear acta</a>
+        <a href="#">{{ icono('folder') }} Mis actas</a>
+        <a href="#">{{ icono('users') }} Asistentes</a>
+        <a href="#">{{ icono('clipboard') }} Compromisos</a>
+        <a href="#">{{ icono('user-circle') }} Usuarios</a>
+        <a href="#">{{ icono('chart') }} Reportes</a>
+        <a href="#">{{ icono('sliders') }} Configuración</a>
+      </nav>
+
+
+      <form class="menu-salir" method="post" action="{{ url_for('logout') }}">
+        <button type="submit">{{ icono('logout') }} Cerrar sesión</button>
+      </form>
+    </aside>
+
+
+    <div class="contenido">
+      <header class="barra">
+        <button type="button" class="barra-campana" aria-label="Notificaciones">{{ icono('bell') }}</button>
+        <div class="usuario">
+          <span class="avatar">{{ iniciales }}</span>
+          <span class="usuario-nombre">{{ nombre }}</span>
+          {{ icono('chevron') }}
+        </div>
+      </header>
+
+
+      <main class="principal">
+        <h1>Hola, {{ partes[0] }} 👋</h1>
+        <p class="sub">Aquí tienes un resumen de tus actas y compromisos.</p>
+        <div class="etiquetas">
+          <span class="etiqueta">Rol: {{ rol }}</span>
+          {% if tipo_vinculacion %}<span class="etiqueta">Vinculación: {{ tipo_vinculacion }}</span>{% endif %}
+        </div>
+
+
+        <section class="resumen" aria-label="Resumen">
+          {% for r in resumen %}
+          <article class="dato">
+            <span class="dato-icono {{ r.color }}">{{ icono(r.icono) }}</span>
+            <div>
+              <p class="dato-titulo">{{ r.titulo }}</p>
+              <p class="dato-valor {{ r.color }}">{{ r.valor }}</p>
+            </div>
+          </article>
+          {% endfor %}
+        </section>
+
+
+        <div class="paneles">
+          <section class="panel">
+            <header class="panel-cab">
+              <h2>Últimas actas</h2>
+              <a href="#">Ver todas</a>
+            </header>
+            <div class="tabla-scroll">
+              <table>
+                <thead>
+                  <tr><th>Acta</th><th>Fecha</th><th>Programa</th><th>Ficha</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                  {% for a in actas %}
+                  <tr>
+                    <td class="fuerte">{{ a.num }}</td>
+                    <td class="fuerte">{{ a.fecha }}</td>
+                    <td class="fuerte">{{ a.programa }}</td>
+                    <td class="fuerte">{{ a.ficha }}</td>
+                    <td><span class="insignia {{ a.clase }}">{{ a.estado }}</span></td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <a class="panel-pie" href="#">Ver todas &gt;</a>
+          </section>
+
+
+          <section class="panel">
+            <header class="panel-cab">
+              <h2>Próximos compromisos</h2>
+            </header>
+            <ul class="compromisos">
+              {% for c in compromisos %}
+              <li>
+                <span class="dato-icono {{ c.color }}">{{ icono(c.icono) }}</span>
+                <div class="compromiso-texto">
+                  <p class="fuerte">{{ c.titulo }}</p>
+                  <p class="fecha">{{ c.fecha }}</p>
+                </div>
+                <span class="insignia {{ c.clase }}">{{ c.estado }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+            <a class="panel-pie" href="#">Ver todos &gt;</a>
+          </section>
+        </div>
+      </main>
+    </div>
+
+
+  </div>
+</body>
+</html>
