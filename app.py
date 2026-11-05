@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import Flask, request, jsonify, render_template, session, url_for, redirect, flash
+from flask import Flask, request, jsonify, render_template, session, url_for, redirect, flash, abort
 import psycopg2
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
@@ -17,7 +17,11 @@ from authlib.integrations.flask_client import OAuth
 from psycopg2.extras import RealDictCursor
 
 
-from db import buscar_usuario_por_correo
+from db import (
+    buscar_usuario_por_correo,
+    acta_del_lider, listar_items, agregar_item, eliminar_item,
+    TIPOS_ITEM, MAX_LARGO_ITEM,
+)
  
 load_dotenv()
  
@@ -98,8 +102,55 @@ def logout():
 
 
 
+# ---------------------------------------------------------------------------
+# US-006 · Agenda y objetivos del acta (solo el líder del acta)
+# ---------------------------------------------------------------------------
+def _acta_propia_o_404(acta_id):
+    if not acta_del_lider(acta_id, session["usuario_id"]):
+        abort(404)  # no revela si el acta existe pero es de otro líder
 
-       
+
+@app.route("/actas/<int:acta_id>/agenda-objetivos")
+@login_requerido
+def agenda_objetivos(acta_id):
+    _acta_propia_o_404(acta_id)
+    return render_template(
+        "agenda_objetivos.html",
+        nombre=session["nombre"], rol=session["rol"],
+        acta_id=acta_id, items=listar_items(acta_id), max_largo=MAX_LARGO_ITEM,
+    )
+
+
+@app.route("/actas/<int:acta_id>/items", methods=["POST"])
+@login_requerido
+def agregar_item_acta(acta_id):
+    _acta_propia_o_404(acta_id)
+    tipo = request.form.get("tipo", "")
+    if tipo not in TIPOS_ITEM:
+        abort(400)
+    try:
+        agregar_item(acta_id, tipo, request.form.get("descripcion", ""))
+    except ValueError as error:
+        flash(str(error))
+    except psycopg2.Error as error:
+        app.logger.error("Error de base de datos: %s", error)
+        flash("No pudimos guardar el ítem. Intenta de nuevo.")
+    return redirect(url_for("agenda_objetivos", acta_id=acta_id) + f"#{tipo}")
+
+
+@app.route("/actas/<int:acta_id>/items/<int:item_id>/eliminar", methods=["POST"])
+@login_requerido
+def eliminar_item_acta(acta_id, item_id):
+    _acta_propia_o_404(acta_id)
+    try:
+        if not eliminar_item(acta_id, item_id):
+            flash("Ese ítem ya no existe.")
+    except psycopg2.Error as error:
+        app.logger.error("Error de base de datos: %s", error)
+        flash("No pudimos quitar el ítem. Intenta de nuevo.")
+    return redirect(url_for("agenda_objetivos", acta_id=acta_id))
+
+
 #************INICIO DEL SERVIDOR***********
 
 
@@ -107,10 +158,11 @@ if __name__ == '__main__':
     print("Iniciando servidor ...")
     app.run(debug=True, host='0.0.0.0', port=5000)
 
+crear_usuarios.py
+
 
  
 
-crear_usuarios.py
 """
 Crea un usuario de prueba con la contraseña ya cifrada.
 

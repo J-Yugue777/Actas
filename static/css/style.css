@@ -543,3 +543,47 @@ tbody tr:last-child td { border-bottom: 0; }
   .resumen { grid-template-columns: 1fr; }
 }
 
+
+
+/* ============ AGENDA Y OBJETIVOS (US-006) ============ */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.items-paneles { margin-top: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); }
+
+.panel .item-ayuda { font-size: 0.82rem; color: var(--texto-suave); }
+
+.items-lista { margin: 0.75rem 0 0; padding: 0; list-style: none; counter-reset: item; }
+.items-lista li {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 0; border-bottom: 1px solid #eef2ef; font-size: 0.85rem;
+}
+.items-lista li { counter-increment: item; }
+.items-lista li::before {
+  content: counter(item) "."; min-width: 1.5rem; font-weight: 700; color: var(--verde-texto);
+}
+.item-texto { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; color: var(--azul-titulo); }
+.items-lista form { margin: 0; }
+
+.item-quitar {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.3rem 0.6rem; font: inherit; font-size: 0.78rem; font-weight: 600;
+  color: var(--rojo); background: transparent; border: 1px solid transparent;
+  border-radius: 8px; cursor: pointer;
+}
+.item-quitar:hover { background: var(--rojo-claro); }
+.item-quitar:focus-visible { outline: 2px solid var(--rojo); outline-offset: 2px; }
+.item-quitar .icono { width: 1rem; height: 1rem; }
+
+.items-vacio { padding: 1rem 0 0; font-size: 0.85rem; color: var(--texto-suave); }
+
+.item-nuevo { display: flex; gap: 0.5rem; padding: 1rem 0 0; }
+.item-nuevo input[type="text"] { flex: 1; min-width: 0; }
+.item-nuevo .btn-primario { width: auto; padding-inline: 1.25rem; margin: 0; }
+
+@media (max-width: 520px) {
+  .item-nuevo { flex-direction: column; }
+  .item-nuevo .btn-primario { width: 100%; }
+}
