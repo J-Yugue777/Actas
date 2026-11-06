@@ -26,6 +26,9 @@ services:
     environment:
       DB_HOST: db      # dentro de Docker la BD se llama "db", no "localhost"
       DB_PORT: 5432    # puerto interno del contenedor
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads   # adjuntos de las actas (US-012)
     ports:
       - "5000:5000"
     depends_on:
@@ -34,3 +37,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

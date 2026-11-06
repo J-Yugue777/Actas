@@ -6,6 +6,9 @@
 {% for mensaje in get_flashed_messages(category_filter=['ok']) %}
   <div class="aviso-ok" role="status">{{ mensaje }}</div>
 {% endfor %}
+{% for mensaje in get_flashed_messages(category_filter=['error']) %}
+  <div class="alerta" role="alert">{{ mensaje }}</div>
+{% endfor %}
 
 <div class="encabezado-acta">
   <div>
@@ -67,4 +70,78 @@
   </div>
   <p class="nota-numero">El acta está abierta: cada participante, incluido quien la creó, registrará aquí su aporte (desarrollo, conclusiones, compromisos, firma y anexos).</p>
 </section>
+
+<section class="panel" id="adjuntos">
+  <header class="panel-cab"><h2>Adjuntos y soportes <small>({{ adjuntos|length }})</small></h2></header>
+
+  {% if adjuntos %}
+  <ul class="adjuntos">
+    {% for a in adjuntos %}
+    <li class="adjunto">
+      {% if a.es_imagen %}
+      <a class="adjunto-miniatura" href="{{ url_for('actas.descargar_adjunto', acta_id=acta.id, adjunto_id=a.id) }}" target="_blank" rel="noopener">
+        <img src="{{ url_for('actas.descargar_adjunto', acta_id=acta.id, adjunto_id=a.id) }}" alt="Foto: {{ a.nombre_original }}" loading="lazy">
+      </a>
+      {% else %}
+      <span class="adjunto-miniatura adjunto-doc" aria-hidden="true">{{ a.nombre_original.rsplit('.', 1)[-1]|upper }}</span>
+      {% endif %}
+      <div class="adjunto-info">
+        <a class="fuerte" href="{{ url_for('actas.descargar_adjunto', acta_id=acta.id, adjunto_id=a.id, descargar=1) }}">{{ a.nombre_original }}</a>
+        <small>{% if a.tamano_bytes >= 1048576 %}{{ '%.1f'|format(a.tamano_bytes / 1048576) }} MB{% else %}{{ (a.tamano_bytes / 1024)|round(0, 'ceil')|int }} KB{% endif %}
+          · {{ a.autor }} · {{ a.creado_en.strftime('%d/%m/%Y %H:%M') }}</small>
+        <small>{{ 'Se inserta en el PDF del acta' if a.es_imagen else 'Queda como archivo aparte' }}</small>
+      </div>
+      {% if puede_gestionar_adjuntos and (a.usuario_id == session.usuario_id or acta.lider_id == session.usuario_id) %}
+      <form method="post" action="{{ url_for('actas.eliminar_adjunto', acta_id=acta.id, adjunto_id=a.id) }}"
+            onsubmit="return confirm('¿Quitar este archivo del acta?');">
+        <button type="submit" class="quitar" aria-label="Quitar {{ a.nombre_original }}">×</button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="nota-numero">Aún no hay archivos adjuntos.</p>
+  {% endif %}
+
+  {% if puede_adjuntar %}
+  <form class="adjuntar" method="post" enctype="multipart/form-data"
+        action="{{ url_for('actas.subir_adjuntos', acta_id=acta.id) }}" id="form-adjuntos">
+    <div class="campo">
+      <label for="archivos">Adjuntar fotos o documentos</label>
+      <input id="archivos" name="archivos" type="file" multiple accept="{{ accept }}" required>
+      <span class="ayuda">Permitidos: {{ tipos_texto }}. Máximo {{ max_mb }} MB por archivo y {{ max_por_persona }} archivos por persona.
+        Las imágenes se insertan en el PDF del acta; los demás documentos quedan como archivos aparte.</span>
+      <span class="ayuda error-campo" id="error-archivos" role="alert" hidden></span>
+    </div>
+    <button type="submit" class="btn-primario">Adjuntar</button>
+  </form>
+  {% elif acta.estado != 'abierta' %}
+  <p class="nota-numero">El acta ya no está abierta, por lo que no se pueden agregar más archivos.</p>
+  {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+{% if puede_adjuntar %}
+<script>
+  // Aviso inmediato; el servidor vuelve a validar todo.
+  (function () {
+    var entrada = document.getElementById('archivos');
+    var aviso = document.getElementById('error-archivos');
+    var permitidas = {{ accept.replace('.', '').split(',')|tojson }};
+    var maximo = {{ max_bytes }};
+    entrada.addEventListener('change', function () {
+      var problemas = [];
+      Array.prototype.forEach.call(entrada.files, function (f) {
+        var ext = f.name.split('.').pop().toLowerCase();
+        if (permitidas.indexOf(ext) === -1) problemas.push(f.name + ': tipo no permitido');
+        else if (f.size > maximo) problemas.push(f.name + ': supera {{ max_mb }} MB');
+      });
+      aviso.textContent = problemas.join(' · ');
+      aviso.hidden = problemas.length === 0;
+      if (problemas.length) entrada.value = '';
+    });
+  })();
+</script>
+{% endif %}
 {% endblock %}

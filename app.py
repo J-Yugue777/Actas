@@ -31,6 +31,7 @@ app.secret_key = os.environ["SECRET_KEY"]
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # tope de toda la petición (US-012: adjuntos)
     # SESSION_COOKIE_SECURE=True,  # actívalo cuando uses HTTPS en producción
 )
 app.register_blueprint(actas_bp)

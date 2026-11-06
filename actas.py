@@ -11,14 +11,16 @@ Reglas de permiso:
 - Actas de "otros asuntos": cualquier usuario autorizado a crear actas.
 - Solo una acta de equipo ejecutor por ficha y mes.
 """
+import sys
 from contextlib import contextmanager
 from datetime import date, time
 from functools import wraps
 
 import psycopg2
 from flask import (Blueprint, abort, current_app, flash, redirect,
-                   render_template, request, session, url_for)
+                   render_template, request, send_from_directory, session, url_for)
 
+import adjuntos as adj
 from db import get_connection
 
 actas_bp = Blueprint("actas", __name__, url_prefix="/actas")
@@ -424,12 +426,167 @@ def ver(acta_id):
                 (acta["lider_id"], acta_id, acta["lider_id"]),
             )
             participantes = cur.fetchall()
+            lista_adjuntos = adj.listar_adjuntos(cur, acta_id)
+            puede_adjuntar = acta["estado"] == "abierta" and (
+                es_participante or acta["lider_id"] == usuario_id)
     except psycopg2.Error:
         current_app.logger.exception("Error de base de datos al ver el acta")
         abort(503)
 
     return render_template(
         "ver_acta.html", acta=acta, meses=MESES, participantes=participantes,
+        adjuntos=lista_adjuntos, puede_adjuntar=puede_adjuntar,
+        puede_gestionar_adjuntos=acta["estado"] == "abierta",
+        max_mb=adj.MAX_BYTES // (1024 * 1024), max_bytes=adj.MAX_BYTES,
+        max_por_persona=adj.MAX_POR_PERSONA, tipos_texto=adj.EXTENSIONES_TEXTO,
+        accept=adj.ACCEPT_HTML,
         agenda=[p["descripcion"] for p in puntos if p["tipo"] == "agenda"],
         objetivos=[p["descripcion"] for p in puntos if p["tipo"] == "objetivo"],
     )
+
+
+# ------------------------------------------------------- US-012 · adjuntos
+def _acceso(cur, acta_id, usuario_id):
+    """Datos de acceso del usuario al acta. 404 si no existe, 403 si no participa."""
+    cur.execute("SELECT id, lider_id, estado FROM actas WHERE id = %s", (acta_id,))
+    acta = cur.fetchone()
+    if acta is None:
+        abort(404)
+    cur.execute(
+        "SELECT r.nombre FROM usuarios u JOIN roles r ON r.id = u.rol_id WHERE u.id = %s",
+        (usuario_id,),
+    )
+    rol = cur.fetchone()["nombre"]
+    cur.execute(
+        "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s",
+        (acta_id, usuario_id),
+    )
+    participa = cur.fetchone() is not None or acta["lider_id"] == usuario_id
+    if not (participa or rol in ROLES_TODAS_LAS_FICHAS):
+        abort(403)
+    return {"acta": acta, "participa": participa, "es_lider": acta["lider_id"] == usuario_id}
+
+
+@actas_bp.route("/<int:acta_id>/adjuntos", methods=["POST"])
+@login_requerido
+def subir_adjuntos(acta_id):
+    usuario_id = session["usuario_id"]
+    archivos = [f for f in request.files.getlist("archivos") if f and f.filename]
+    destino = redirect(url_for("actas.ver", acta_id=acta_id) + "#adjuntos")
+    if not archivos:
+        flash("Selecciona al menos un archivo para adjuntar.", "error")
+        return destino
+
+    guardados, rechazados, rutas = 0, [], []
+    try:
+        with transaccion() as cur:
+            acceso = _acceso(cur, acta_id, usuario_id)
+            if not acceso["participa"]:
+                abort(403)
+            if acceso["acta"]["estado"] != "abierta":
+                flash("El acta ya no está abierta: no se pueden adjuntar más archivos.", "error")
+                return destino
+
+            # Serializa las subidas del mismo acta para respetar el tope por persona
+            cur.execute("SELECT id FROM actas WHERE id = %s FOR UPDATE", (acta_id,))
+            disponibles = adj.MAX_POR_PERSONA - adj.contar_de_persona(cur, acta_id, usuario_id)
+
+            for archivo in archivos:
+                nombre = adj.nombre_para_mostrar(archivo)
+                try:
+                    if disponibles <= 0:
+                        raise ValueError(f"ya alcanzaste el máximo de {adj.MAX_POR_PERSONA} archivos en esta acta.")
+                    extension, mime, es_imagen, tamano = adj.validar_archivo(archivo)
+                except ValueError as error:
+                    rechazados.append(f"{nombre or 'Archivo'}: {error}")
+                    continue
+                guardado = adj.guardar_en_disco(archivo, extension)
+                rutas.append(guardado)
+                adj.insertar_adjunto(cur, acta_id, usuario_id, nombre, guardado, mime, tamano, es_imagen)
+                disponibles -= 1
+                guardados += 1
+    except BaseException:
+        for ruta in rutas:  # la transacción se revirtió: no dejes archivos huérfanos
+            adj.borrar_de_disco(ruta)
+        if isinstance(sys.exc_info()[1], psycopg2.Error):
+            current_app.logger.exception("Error de base de datos al subir adjuntos")
+            flash("No pudimos guardar los archivos. Intenta de nuevo.", "error")
+            return destino
+        raise
+
+    if guardados:
+        flash(f"{guardados} archivo(s) adjuntado(s).", "ok")
+    for motivo in rechazados:
+        flash(f"No se adjuntó {motivo}", "error")
+    return destino
+
+
+@actas_bp.route("/<int:acta_id>/adjuntos/<int:adjunto_id>")
+@login_requerido
+def descargar_adjunto(acta_id, adjunto_id):
+    try:
+        with transaccion() as cur:
+            _acceso(cur, acta_id, session["usuario_id"])
+            cur.execute(
+                "SELECT nombre_original, nombre_archivo, tipo_mime, es_imagen "
+                "FROM acta_adjuntos WHERE id = %s AND acta_id = %s",
+                (adjunto_id, acta_id),
+            )
+            fila = cur.fetchone()
+    except psycopg2.Error:
+        current_app.logger.exception("Error de base de datos al descargar el adjunto")
+        abort(503)
+    if fila is None:
+        abort(404)
+
+    # Las imágenes se muestran en la página; todo lo demás se descarga.
+    como_descarga = (not fila["es_imagen"]) or request.args.get("descargar") == "1"
+    respuesta = send_from_directory(
+        adj.carpeta_subidas(), fila["nombre_archivo"], mimetype=fila["tipo_mime"],
+        as_attachment=como_descarga, download_name=fila["nombre_original"],
+    )
+    respuesta.headers["X-Content-Type-Options"] = "nosniff"
+    respuesta.headers["Cache-Control"] = "private, max-age=300"
+    return respuesta
+
+
+@actas_bp.route("/<int:acta_id>/adjuntos/<int:adjunto_id>/eliminar", methods=["POST"])
+@login_requerido
+def eliminar_adjunto(acta_id, adjunto_id):
+    usuario_id = session["usuario_id"]
+    archivo_a_borrar = None
+    try:
+        with transaccion() as cur:
+            acceso = _acceso(cur, acta_id, usuario_id)
+            if acceso["acta"]["estado"] != "abierta":
+                flash("El acta ya no está abierta: no se pueden quitar archivos.", "error")
+            else:
+                cur.execute(
+                    "SELECT usuario_id, nombre_archivo FROM acta_adjuntos WHERE id = %s AND acta_id = %s",
+                    (adjunto_id, acta_id),
+                )
+                fila = cur.fetchone()
+                if fila is None:
+                    flash("Ese archivo ya no existe.", "error")
+                elif fila["usuario_id"] != usuario_id and not acceso["es_lider"]:
+                    abort(403)  # solo quien lo subió o el líder del acta
+                else:
+                    cur.execute("DELETE FROM acta_adjuntos WHERE id = %s", (adjunto_id,))
+                    archivo_a_borrar = fila["nombre_archivo"]
+                    flash("Archivo eliminado.", "ok")
+    except psycopg2.Error:
+        current_app.logger.exception("Error de base de datos al eliminar el adjunto")
+        flash("No pudimos eliminar el archivo. Intenta de nuevo.", "error")
+    if archivo_a_borrar:
+        adj.borrar_de_disco(archivo_a_borrar)
+    return redirect(url_for("actas.ver", acta_id=acta_id) + "#adjuntos")
+
+
+@actas_bp.app_errorhandler(413)
+def archivo_demasiado_grande(error):
+    """La petición completa superó MAX_CONTENT_LENGTH (ver app.py)."""
+    if request.endpoint == "actas.subir_adjuntos":
+        flash("Los archivos juntos pesan demasiado. Sube menos archivos a la vez "
+              f"(máximo {adj.MAX_BYTES // (1024 * 1024)} MB cada uno).", "error")
+        return redirect(url_for("actas.ver", acta_id=request.view_args["acta_id"]) + "#adjuntos")
+    return error
