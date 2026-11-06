@@ -1,0 +1,231 @@
+{% extends 'base_app.html' %}
+{% set menu_activo = 'crear' %}
+{% block titulo %}Crear acta | Actas SENA{% endblock %}
+
+{% block contenido %}
+<h1>Crear acta</h1>
+<p class="sub">Registra los datos generales. Al guardar, el acta queda abierta para que los participantes hagan sus aportes.</p>
+
+{% if errores %}
+<div class="alerta alerta-lista" role="alert">
+  <strong>Revisa lo siguiente:</strong>
+  <ul>{% for e in errores %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<form class="acta-form" method="post" action="{{ url_for('actas.crear') }}">
+
+  <section class="panel">
+    <header class="panel-cab"><h2>Tipo de acta</h2></header>
+    <div class="opciones-tipo">
+      {% if puede_equipo %}
+      <label class="opcion">
+        <input type="radio" name="tipo_acta" value="equipo_ejecutor" {{ 'checked' if datos.tipo_acta == 'equipo_ejecutor' }}>
+        <span><strong>Equipo ejecutor</strong><small>Acta mensual de una ficha</small></span>
+      </label>
+      {% endif %}
+      <label class="opcion">
+        <input type="radio" name="tipo_acta" value="otros_asuntos" {{ 'checked' if datos.tipo_acta == 'otros_asuntos' }}>
+        <span><strong>Otros asuntos</strong><small>Reunión que no es de una ficha</small></span>
+      </label>
+    </div>
+
+    {% if puede_equipo %}
+    <div class="rejilla" id="bloque-equipo">
+      <div class="campo">
+        <label for="ficha_id">Ficha</label>
+        <select id="ficha_id" name="ficha_id">
+          <option value="">Selecciona la ficha…</option>
+          {% for f in fichas %}
+          <option value="{{ f.id }}" {{ 'selected' if datos.ficha_id == f.id|string }}>{{ f.numero }} — {{ f.programa }}</option>
+          {% endfor %}
+        </select>
+        <small class="ayuda">Solo aparecen las fichas en las que puedes crear actas.</small>
+      </div>
+      <div class="campo">
+        <label for="mes">Mes del acta</label>
+        <select id="mes" name="mes">
+          <option value="">Selecciona el mes…</option>
+          {% for m in meses %}
+          <option value="{{ loop.index }}" {{ 'selected' if datos.mes == loop.index|string }}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <header class="panel-cab"><h2>Datos generales</h2></header>
+    <p class="nota-numero">El número de acta se asigna automáticamente al guardar (consecutivo por centro, ficha y año).</p>
+
+    <div class="rejilla">
+      <div class="campo completo">
+        <label for="nombre_reunion">Nombre de la reunión</label>
+        <input type="text" id="nombre_reunion" name="nombre_reunion" value="{{ datos.nombre_reunion }}" maxlength="200" required>
+      </div>
+
+      <div class="campo">
+        <label for="ciudad">Ciudad</label>
+        <input type="text" id="ciudad" name="ciudad" value="{{ datos.ciudad }}" maxlength="100" placeholder="Ej.: Palmira" required>
+      </div>
+      <div class="campo">
+        <label for="fecha_reunion">Fecha de la reunión</label>
+        <input type="date" id="fecha_reunion" name="fecha_reunion" value="{{ datos.fecha_reunion }}" required>
+      </div>
+
+      <div class="campo">
+        <label for="hora_inicio">Hora de inicio</label>
+        <input type="time" id="hora_inicio" name="hora_inicio" value="{{ datos.hora_inicio }}" required>
+      </div>
+      <div class="campo">
+        <label for="hora_fin">Hora de fin</label>
+        <input type="time" id="hora_fin" name="hora_fin" value="{{ datos.hora_fin }}" required>
+      </div>
+
+      <div class="campo completo">
+        <label for="lugar_enlace">Lugar o enlace de la reunión</label>
+        <input type="text" id="lugar_enlace" name="lugar_enlace" value="{{ datos.lugar_enlace }}" maxlength="300" placeholder="Sitio físico o enlace de Teams" required>
+      </div>
+
+      <div class="campo">
+        <label for="regional_id">Dirección regional</label>
+        <select id="regional_id" name="regional_id" required>
+          <option value="">Selecciona la regional…</option>
+          {% for r in regionales %}
+          <option value="{{ r.id }}" {{ 'selected' if datos.regional_id == r.id|string }}>{{ r.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo">
+        <label for="centro_id">Centro de formación</label>
+        <select id="centro_id" name="centro_id" required disabled>
+          <option value="">Primero elige la regional</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label for="codigo_formato">Código y versión del formato</label>
+        <input type="text" id="codigo_formato" name="codigo_formato" value="{{ datos.codigo_formato }}" maxlength="30">
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-cab"><h2>Agenda y objetivos</h2></header>
+
+    <div class="lista-dinamica" data-nombre="agenda" data-placeholder="Punto a desarrollar">
+      <h3>Agenda / puntos a desarrollar</h3>
+      <div class="items">
+        {% for t in (datos.agenda or ['']) %}
+        <div class="item">
+          <input type="text" name="agenda" value="{{ t }}" maxlength="500" placeholder="Punto a desarrollar" aria-label="Punto de la agenda">
+          <button type="button" class="quitar" aria-label="Quitar punto">×</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="agregar">+ Agregar punto</button>
+    </div>
+
+    <div class="lista-dinamica" data-nombre="objetivos" data-placeholder="Objetivo de la reunión">
+      <h3>Objetivos de la reunión</h3>
+      <div class="items">
+        {% for t in (datos.objetivos or ['']) %}
+        <div class="item">
+          <input type="text" name="objetivos" value="{{ t }}" maxlength="500" placeholder="Objetivo de la reunión" aria-label="Objetivo de la reunión">
+          <button type="button" class="quitar" aria-label="Quitar objetivo">×</button>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="agregar">+ Agregar objetivo</button>
+    </div>
+  </section>
+
+  <div class="acciones">
+    <button type="submit" class="btn-primario">Guardar y abrir acta</button>
+    <a class="btn-sec" href="{{ url_for('inicio') }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const CENTROS = {{ centros|tojson }};
+  const CENTRO_ELEGIDO = {{ (datos.centro_id or '')|tojson }};
+
+  // Centros dependientes de la regional
+  const selRegional = document.getElementById('regional_id');
+  const selCentro = document.getElementById('centro_id');
+
+  function llenarCentros(preseleccion) {
+    selCentro.innerHTML = '';
+    const vacio = document.createElement('option');
+    vacio.value = '';
+    vacio.textContent = selRegional.value ? 'Selecciona el centro…' : 'Primero elige la regional';
+    selCentro.appendChild(vacio);
+
+    CENTROS.filter(c => String(c.regional_id) === selRegional.value).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = c.nombre;
+      if (String(c.id) === String(preseleccion)) o.selected = true;
+      selCentro.appendChild(o);
+    });
+    selCentro.disabled = !selRegional.value;
+  }
+  selRegional.addEventListener('change', () => llenarCentros(''));
+  llenarCentros(CENTRO_ELEGIDO);
+
+  // Mostrar ficha y mes solo en actas de equipo ejecutor
+  const bloqueEquipo = document.getElementById('bloque-equipo');
+  function actualizarTipo() {
+    if (!bloqueEquipo) return;
+    const marcado = document.querySelector('input[name="tipo_acta"]:checked');
+    bloqueEquipo.hidden = !(marcado && marcado.value === 'equipo_ejecutor');
+  }
+  document.querySelectorAll('input[name="tipo_acta"]').forEach(r => r.addEventListener('change', actualizarTipo));
+  actualizarTipo();
+
+  // El mes se propone según la fecha, mientras la persona no lo cambie
+  const selMes = document.getElementById('mes');
+  const campoFecha = document.getElementById('fecha_reunion');
+  let mesManual = selMes && selMes.value !== '';
+  if (selMes) selMes.addEventListener('change', () => { mesManual = true; });
+  campoFecha.addEventListener('change', () => {
+    if (!selMes || mesManual || !campoFecha.value) return;
+    selMes.value = String(parseInt(campoFecha.value.split('-')[1], 10));
+  });
+
+  // Listas con puntos que se pueden agregar y quitar
+  document.querySelectorAll('.lista-dinamica').forEach(lista => {
+    const contenedor = lista.querySelector('.items');
+    const nombre = lista.dataset.nombre;
+
+    function nuevoItem() {
+      const fila = document.createElement('div');
+      fila.className = 'item';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.name = nombre;
+      input.maxLength = 500;
+      input.placeholder = lista.dataset.placeholder;
+      const quitar = document.createElement('button');
+      quitar.type = 'button';
+      quitar.className = 'quitar';
+      quitar.textContent = '×';
+      quitar.setAttribute('aria-label', 'Quitar');
+      fila.append(input, quitar);
+      contenedor.appendChild(fila);
+      input.focus();
+    }
+
+    lista.querySelector('.agregar').addEventListener('click', nuevoItem);
+    lista.addEventListener('click', e => {
+      if (!e.target.classList.contains('quitar')) return;
+      const filas = contenedor.querySelectorAll('.item');
+      if (filas.length === 1) { filas[0].querySelector('input').value = ''; return; }
+      e.target.closest('.item').remove();
+    });
+  });
+</script>
+{% endblock %}

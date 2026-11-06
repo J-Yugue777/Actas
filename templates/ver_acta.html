@@ -1,0 +1,70 @@
+{% extends 'base_app.html' %}
+{% set menu_activo = 'crear' %}
+{% block titulo %}{{ acta.numero_acta }} | Actas SENA{% endblock %}
+
+{% block contenido %}
+{% for mensaje in get_flashed_messages(category_filter=['ok']) %}
+  <div class="aviso-ok" role="status">{{ mensaje }}</div>
+{% endfor %}
+
+<div class="encabezado-acta">
+  <div>
+    <h1>{{ acta.numero_acta }}</h1>
+    <p class="sub">{{ acta.nombre_reunion }}</p>
+  </div>
+  <div class="acciones">
+    {% if acta.lider_id == session.usuario_id %}
+    <a class="btn-sec" href="{{ url_for('agenda_objetivos', acta_id=acta.id) }}">Editar agenda y objetivos</a>
+    {% endif %}
+    <span class="insignia {{ 'verde' if acta.estado == 'abierta' else 'azul' }}">{{ acta.estado|capitalize }}</span>
+  </div>
+</div>
+
+<section class="panel">
+  <header class="panel-cab"><h2>Datos generales</h2></header>
+  <dl class="datos">
+    <div><dt>Tipo de acta</dt><dd>{{ 'Equipo ejecutor' if acta.tipo_acta == 'equipo_ejecutor' else 'Otros asuntos' }}</dd></div>
+    {% if acta.ficha %}
+    <div><dt>Ficha</dt><dd>{{ acta.ficha }} — {{ acta.programa }}</dd></div>
+    <div><dt>Mes</dt><dd>{{ meses[acta.mes - 1] }} de {{ acta.anio }}</dd></div>
+    {% endif %}
+    <div><dt>Ciudad y fecha</dt><dd>{{ acta.ciudad }}, {{ acta.fecha_reunion.strftime('%d/%m/%Y') }}</dd></div>
+    <div><dt>Horario</dt><dd>{{ acta.hora_inicio.strftime('%H:%M') }} a {{ acta.hora_fin.strftime('%H:%M') }}</dd></div>
+    <div><dt>Lugar o enlace</dt><dd>{{ acta.lugar_enlace }}</dd></div>
+    <div><dt>Regional</dt><dd>{{ acta.regional }}</dd></div>
+    <div><dt>Centro de formación</dt><dd>{{ acta.centro }}</dd></div>
+    {% if acta.codigo_formato %}<div><dt>Formato</dt><dd>{{ acta.codigo_formato }}</dd></div>{% endif %}
+    <div><dt>Creada por</dt><dd>{{ acta.creador }}</dd></div>
+  </dl>
+</section>
+
+<div class="paneles paneles-iguales">
+  <section class="panel">
+    <header class="panel-cab"><h2>Agenda / puntos a desarrollar</h2></header>
+    <ol class="lista-texto">{% for t in agenda %}<li>{{ t }}</li>{% endfor %}</ol>
+  </section>
+  <section class="panel">
+    <header class="panel-cab"><h2>Objetivos de la reunión</h2></header>
+    <ol class="lista-texto">{% for t in objetivos %}<li>{{ t }}</li>{% endfor %}</ol>
+  </section>
+</div>
+
+<section class="panel">
+  <header class="panel-cab"><h2>Participantes</h2></header>
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Nombre</th><th>Rol</th><th>Aporte</th></tr></thead>
+      <tbody>
+        {% for p in participantes %}
+        <tr>
+          <td class="fuerte">{{ p.nombre }} {{ p.apellido }}{% if p.es_creador %} <small>(creador)</small>{% endif %}</td>
+          <td>{{ p.rol }}</td>
+          <td><span class="insignia {{ 'verde' if p.aporto else 'amarillo' }}">{{ 'Registrado' if p.aporto else 'Pendiente' }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="nota-numero">El acta está abierta: cada participante, incluido quien la creó, registrará aquí su aporte (desarrollo, conclusiones, compromisos, firma y anexos).</p>
+</section>
+{% endblock %}

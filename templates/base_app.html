@@ -1,0 +1,62 @@
+{% from '_iconos.html' import icono %}
+{% set partes = session.nombre.split() %}
+{% set iniciales = (partes[0][0] ~ (partes[-1][0] if partes|length > 1 else ''))|upper %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Actas SENA{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/actas.css') }}">
+</head>
+<body class="pagina-inicio">
+  <div class="app">
+
+    <aside class="lateral">
+      <div class="lateral-logo">
+        <img src="{{ url_for('static', filename='img/logo-sena.png') }}" alt=""
+             onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+        <span class="marca-logo-texto" hidden>SENA</span>
+      </div>
+
+      <nav class="menu" aria-label="Principal">
+        <a href="{{ url_for('inicio') }}" class="{{ 'activo' if menu_activo == 'inicio' }}">{{ icono('home') }} Inicio</a>
+        {% if puede_crear_acta %}
+        <a href="{{ url_for('actas.crear') }}" class="{{ 'activo' if menu_activo == 'crear' }}">{{ icono('file-plus') }} Crear acta</a>
+        {% endif %}
+        <a href="#">{{ icono('folder') }} Mis actas</a>
+        <a href="#">{{ icono('users') }} Asistentes</a>
+        <a href="#">{{ icono('clipboard') }} Compromisos</a>
+        <a href="#">{{ icono('user-circle') }} Usuarios</a>
+        <a href="#">{{ icono('chart') }} Reportes</a>
+        <a href="#">{{ icono('sliders') }} Configuración</a>
+      </nav>
+
+      <form class="menu-salir" method="post" action="{{ url_for('logout') }}">
+        <button type="submit">{{ icono('logout') }} Cerrar sesión</button>
+      </form>
+    </aside>
+
+    <div class="contenido">
+      <header class="barra">
+        <button type="button" class="barra-campana" aria-label="Notificaciones">{{ icono('bell') }}</button>
+        <div class="usuario">
+          <span class="avatar">{{ iniciales }}</span>
+          <span class="usuario-nombre">{{ session.nombre }}</span>
+          {{ icono('chevron') }}
+        </div>
+      </header>
+
+      <main class="principal">
+        {% block contenido %}{% endblock %}
+      </main>
+    </div>
+
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

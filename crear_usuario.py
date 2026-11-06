@@ -1,5 +1,5 @@
 """
-Crea un usuario de prueba con la contraseña ya cifrada.
+Crea un usuario con la contraseña ya cifrada.
 
 Uso:
     python crear_usuario.py
@@ -18,27 +18,31 @@ fecha_nacimiento = date.fromisoformat(input("Fecha de nacimiento (AAAA-MM-DD): "
 correo = input("Correo: ").strip()
 password = getpass("Contraseña: ")
 nombre_rol = input("Nombre del rol (ej. Administrador): ").strip()
+tipo_vinculacion = input("Tipo de vinculación (ej. Carrera administrativa, Provisional, Contratista): ").strip()
+direccion = input("Dirección: ").strip()
+telefono = input("Teléfono: ").strip()
 
 with get_connection() as conn:
     with conn.cursor() as cur:
-        # Reutiliza el rol si ya existe; si no, lo crea
         cur.execute("SELECT id FROM roles WHERE nombre = %s", (nombre_rol,))
         fila = cur.fetchone()
-        if fila:
-            rol_id = fila["id"]
-        else:
-            cur.execute("INSERT INTO roles (nombre) VALUES (%s) RETURNING id", (nombre_rol,))
-            rol_id = cur.fetchone()["id"]
+        if fila is None:
+            cur.execute("SELECT nombre FROM roles ORDER BY nombre")
+            disponibles = ", ".join(r["nombre"] for r in cur.fetchall())
+            raise SystemExit(f'El rol "{nombre_rol}" no existe. Roles disponibles: {disponibles}')
+        rol_id = fila["id"]
 
         cur.execute(
             """
             INSERT INTO usuarios
-                (nombre, apellido, tipo_documento, fecha_nacimiento,
-                 correo, password_hash, rol_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (nombre, apellido, tipo_documento, fecha_nacimiento, correo,
+                 password_hash, tipo_vinculacion, direccion, telefono, rol_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (nombre, apellido, tipo_documento, fecha_nacimiento,
-             correo, generate_password_hash(password), rol_id),
+            (nombre, apellido, tipo_documento, fecha_nacimiento, correo,
+             generate_password_hash(password),
+             tipo_vinculacion or None, direccion or None, telefono or None,
+             rol_id),
         )
 
 print("Usuario creado correctamente.")

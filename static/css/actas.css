@@ -1,0 +1,151 @@
+/* Estilos del módulo de actas (se carga después de style.css) */
+
+.acta-form { display: grid; gap: 1.25rem; margin-top: 1.5rem; }
+
+.rejilla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.25rem; }
+.rejilla .completo { grid-column: 1 / -1; }
+
+.campo label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--azul-titulo);
+}
+
+.campo input,
+.campo select,
+.lista-dinamica input {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--texto);
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+}
+
+.campo select:disabled { background: #f0f3f1; color: var(--texto-suave); }
+
+.campo input:focus-visible,
+.campo select:focus-visible,
+.lista-dinamica input:focus-visible,
+.agregar:focus-visible,
+.quitar:focus-visible,
+.btn-sec:focus-visible,
+.opcion:focus-within {
+  outline: 3px solid #9bd488;
+  outline-offset: 1px;
+}
+
+.ayuda { display: block; margin-top: 0.3rem; font-size: 0.75rem; color: var(--texto-suave); }
+
+/* Tipo de acta */
+.opciones-tipo { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
+
+.opcion {
+  flex: 1 1 14rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.opcion:has(input:checked) { border-color: var(--verde); background: #f2faee; }
+.opcion input { width: auto; margin-top: 0.25rem; accent-color: var(--verde); }
+.opcion span { display: grid; gap: 0.1rem; font-size: 0.88rem; color: var(--azul-titulo); }
+.opcion small { color: var(--texto-suave); font-size: 0.78rem; }
+
+.nota-numero {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+  background: #f2f6f4;
+  border-radius: 8px;
+}
+
+/* Listas dinámicas */
+.lista-dinamica + .lista-dinamica { margin-top: 1.5rem; }
+.lista-dinamica h3 { margin: 0 0 0.6rem; font-size: 0.88rem; color: var(--azul-titulo); }
+.items { display: grid; gap: 0.5rem; }
+.item { display: flex; gap: 0.5rem; }
+
+.quitar {
+  flex: none;
+  width: 2.5rem;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--rojo);
+  background: var(--rojo-claro);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.agregar {
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.9rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--verde-texto);
+  background: transparent;
+  border: 1px dashed var(--verde);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.agregar:hover { background: var(--verde-claro); }
+
+/* Acciones */
+.acciones { display: flex; align-items: center; gap: 1rem; }
+.acciones .btn-primario { width: auto; margin: 0; padding: 0.8rem 1.8rem; }
+
+.btn-sec {
+  padding: 0.75rem 1.4rem;
+  font-weight: 600;
+  color: var(--azul-titulo);
+  text-decoration: none;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+}
+
+.btn-sec:hover { background: #eef2ef; }
+
+/* Mensajes */
+.alerta-lista { margin-top: 1.25rem; }
+.alerta-lista ul { margin: 0.4rem 0 0; padding-left: 1.2rem; list-style: disc; }
+
+.aviso-ok {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f6b0f;
+  background: var(--verde-claro);
+  border-radius: 8px;
+}
+
+/* Ver acta */
+.encabezado-acta { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.panel + .panel,
+.paneles + .panel,
+.panel + .paneles { margin-top: 1.25rem; }
+.paneles-iguales { grid-template-columns: 1fr 1fr; margin-top: 1.25rem; }
+
+.datos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem 1.5rem; margin: 0; }
+.datos dt { font-size: 0.75rem; font-weight: 600; color: var(--texto-suave); }
+.datos dd { margin: 0.1rem 0 0; font-size: 0.9rem; font-weight: 600; color: var(--azul-titulo); }
+
+.lista-texto { margin: 0; padding-left: 1.2rem; font-size: 0.9rem; }
+.lista-texto li + li { margin-top: 0.4rem; }
+
+@media (max-width: 800px) {
+  .rejilla, .datos, .paneles-iguales { grid-template-columns: 1fr; }
+  .acciones { flex-wrap: wrap; }
+}

@@ -49,7 +49,7 @@
 
       <nav class="menu" aria-label="Principal">
         <a href="{{ url_for('inicio') }}" class="activo" aria-current="page">{{ icono('home') }} Inicio</a>
-        <a href="#">{{ icono('file-plus') }} Crear acta</a>
+        {% if puede_crear_acta %}<a href="{{ url_for('actas.crear') }}">{{ icono('file-plus') }} Crear acta</a>{% endif %}
         <a href="#">{{ icono('folder') }} Mis actas</a>
         <a href="#">{{ icono('users') }} Asistentes</a>
         <a href="#">{{ icono('clipboard') }} Compromisos</a>

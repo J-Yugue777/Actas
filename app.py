@@ -22,6 +22,7 @@ from db import (
     acta_del_lider, listar_items, agregar_item, eliminar_item,
     TIPOS_ITEM, MAX_LARGO_ITEM,
 )
+from actas import actas_bp
  
 load_dotenv()
  
@@ -32,6 +33,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     # SESSION_COOKIE_SECURE=True,  # actívalo cuando uses HTTPS en producción
 )
+app.register_blueprint(actas_bp)
  
  
 def login_requerido(vista):
@@ -103,7 +105,7 @@ def logout():
 
 
 # ---------------------------------------------------------------------------
-# US-006 · Agenda y objetivos del acta (solo el líder del acta)
+# Agenda y objetivos del acta (solo el líder del acta)
 # ---------------------------------------------------------------------------
 def _acta_propia_o_404(acta_id):
     if not acta_del_lider(acta_id, session["usuario_id"]):
@@ -158,60 +160,3 @@ if __name__ == '__main__':
     print("Iniciando servidor ...")
     app.run(debug=True, host='0.0.0.0', port=5000)
 
-crear_usuarios.py
-
-
- 
-
-"""
-Crea un usuario de prueba con la contraseña ya cifrada.
-
-
-Uso:
-    python crear_usuario.py
-"""
-from datetime import date
-from getpass import getpass
-
-
-from werkzeug.security import generate_password_hash
-
-
-from db import get_connection
-
-
-nombre = input("Nombre: ").strip()
-apellido = input("Apellido: ").strip()
-tipo_documento = input("Tipo de documento (ej. CC): ").strip()
-fecha_nacimiento = date.fromisoformat(input("Fecha de nacimiento (AAAA-MM-DD): ").strip())
-correo = input("Correo: ").strip()
-password = getpass("Contraseña: ")
-nombre_rol = input("Nombre del rol (ej. Administrador): ").strip()
-tipo_vinculacion = input("Tipo de vinculación (ej. Carrera administrativa, Provisional, Contratista): ").strip()
-
-
-with get_connection() as conn:
-    with conn.cursor() as cur:
-        # Reutiliza el rol si ya existe; si no, lo crea
-        cur.execute("SELECT id FROM roles WHERE nombre = %s", (nombre_rol,))
-        fila = cur.fetchone()
-        if fila:
-            rol_id = fila["id"]
-        else:
-            cur.execute("INSERT INTO roles (nombre) VALUES (%s) RETURNING id", (nombre_rol,))
-            rol_id = cur.fetchone()["id"]
-
-
-        cur.execute(
-            """
-            INSERT INTO usuarios
-                (nombre, apellido, tipo_documento, fecha_nacimiento,
-                 correo, password_hash, tipo_vinculacion, rol_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (nombre, apellido, tipo_documento, fecha_nacimiento,
-             correo, generate_password_hash(password), tipo_vinculacion, rol_id),
-        )
-
-
-print("Usuario creado correctamente.")
