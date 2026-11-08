@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import Flask, request, jsonify, render_template, session, url_for, redirect, flash, abort
+from flask import Flask, request, jsonify, render_template, session, url_for, redirect, flash, abort,send_from_directory,send_file, send_from_directory
 import psycopg2
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
@@ -7,6 +7,7 @@ from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 import secrets, hashlib, uuid
 import threading
 import os
+import io
 from datetime import datetime, timedelta
 import vt
 import time
@@ -15,6 +16,23 @@ from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from authlib.integrations.flask_client import OAuth
 from psycopg2.extras import RealDictCursor
+from dataclasses import dataclass
+from datetime import date
+from typing import List, Optional
+import base64
+import json
+import os
+from xml.sax.saxutils import escape
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import cm
+from reportlab.platypus import (Image, PageBreak, Paragraph, SimpleDocTemplate,Spacer, Table, TableStyle)
+from PIL import Image as PILImage
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer
 
 
 from db import (
@@ -23,6 +41,7 @@ from db import (
     TIPOS_ITEM, MAX_LARGO_ITEM,
 )
 from actas import actas_bp
+
  
 load_dotenv()
  
@@ -103,6 +122,10 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+@app.route('/Formato_acta')
+def Formato_acta():
+    return render_template('Formato_acta.html')
+
 
 
 # ---------------------------------------------------------------------------
@@ -160,4 +183,3 @@ def eliminar_item_acta(acta_id, item_id):
 if __name__ == '__main__':
     print("Iniciando servidor ...")
     app.run(debug=True, host='0.0.0.0', port=5000)
-

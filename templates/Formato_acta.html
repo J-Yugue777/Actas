@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Acta GOR-F084 V2</title>
+</head>
+<body>
+<h1>Acta de reunión GOR-F084 V2</h1>
+
+<form id="formActa">
+
+  <p><label>Nombre del comité o de la reunión:<br>
+    <input type="text" id="nombre_comite" required></label></p>
+
+  <p><label>Ciudad:<br>
+    <input type="text" id="ciudad" required></label></p>
+
+  <p><label>Fecha:<br>
+    <input type="date" id="fecha" required></label></p>
+
+  <p><label>Hora inicio:<br>
+    <input type="time" id="hora_inicio" required></label></p>
+
+  <p><label>Hora fin:<br>
+    <input type="time" id="hora_fin" required></label></p>
+
+  <p><label>Lugar y/o enlace:<br>
+    <input type="text" id="lugar_enlace" required></label></p>
+
+  <p><label>Dirección regional centro:<br>
+    <input type="text" id="direccion_regional" required></label></p>
+
+  <p><label>Agenda o puntos para desarrollar:<br>
+    <textarea id="agenda" rows="4" cols="60"></textarea></label></p>
+
+  <p><label>Objetivos de la reunión:<br>
+    <textarea id="objetivos_de_reunion" rows="4" cols="60"></textarea></label></p>
+
+  <p><label>Desarrollo de la reunión:<br>
+    <textarea id="desarrollo" rows="6" cols="60"></textarea></label></p>
+
+  <p><label>Conclusiones:<br>
+    <textarea id="conclusiones" rows="4" cols="60"></textarea></label></p>
+
+  <h2>Compromisos</h2>
+  <table border="1" id="tablaCompromisos">
+    <thead>
+      <tr>
+        <th>Actividad / decisión</th>
+        <th>Fecha</th>
+        <th>Responsable</th>
+        <th>Firma o participación virtual</th>
+        <th>Quitar</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p><button type="button" id="btnAddCompromiso">Agregar compromiso</button></p>
+
+  <h2>Asistentes y aprobación de decisiones</h2>
+  <table border="1" id="tablaAsistentes">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Dependencia / empresa</th>
+        <th>Aprueba</th>
+        <th>Observación</th>
+        <th>Firma o participación virtual</th>
+        <th>Quitar</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p><button type="button" id="btnAddAsistente">Agregar asistente</button></p>
+
+  <h2>Anexos</h2>
+  <p><label>Capturas de pantalla (imágenes):<br>
+    <input type="file" id="anexos" accept="image/*" multiple></label></p>
+
+  <p>
+    <button type="button" id="btnGuardar">Guardar borrador</button>
+    <button type="button" id="btnCargar">Cargar borrador</button>
+    <button type="submit" id="btnEnviar">Enviar</button>
+  </p>
+  <p id="mensaje"></p>
+</form>
+
+<h2>Descargas</h2>
+<div id="descargas">
+  <p>Cuando envíes el acta, aquí aparecerán el PDF y los anexos para descargar.</p>
+</div>
+
+<script>
+const CLAVE_BORRADOR = "acta_gorf084_v2_borrador";
+const URL_ENVIO = "/api/actas";
+
+// ---------- Utilidades de tipos ----------
+function texto(valor) {
+  return String(valor === undefined || valor === null ? "" : valor).trim();
+}
+function fechaValida(valor) {
+  // input type=date entrega AAAA-MM-DD
+  return /^\d{4}-\d{2}-\d{2}$/.test(valor) && !Number.isNaN(Date.parse(valor)) ? valor : "";
+}
+function horaValida(valor) {
+  // input type=time entrega HH:MM (24 horas)
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) ? valor : "";
+}
+function normalizarHora(valor) {
+  // Convierte borradores viejos: 21 -> "21:00". Deja pasar "21:30".
+  if (valor === null || valor === undefined || valor === "") return "";
+  const t = String(valor).trim();
+  if (/^\d{1,2}$/.test(t)) return horaValida(t.padStart(2, "0") + ":00");
+  return horaValida(t.slice(0, 5));
+}
+function mostrar(msg) {
+  document.getElementById("mensaje").textContent = msg;
+}
+
+// ---------- Filas dinámicas ----------
+function agregarCompromiso(d) {
+  d = d || {};
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input type="text" class="c_actividad"></td>' +
+    '<td><input type="date" class="c_fecha"></td>' +
+    '<td><input type="text" class="c_responsable"></td>' +
+    '<td><input type="text" class="c_firma"></td>' +
+    '<td><button type="button" class="quitar">X</button></td>';
+  tr.querySelector(".c_actividad").value = d.actividad || "";
+  tr.querySelector(".c_fecha").value = d.fecha || "";
+  tr.querySelector(".c_responsable").value = d.responsable || "";
+  tr.querySelector(".c_firma").value = d.firma || "";
+  tr.querySelector(".quitar").onclick = () => tr.remove();
+  document.querySelector("#tablaCompromisos tbody").appendChild(tr);
+}
+
+function agregarAsistente(d) {
+  d = d || {};
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input type="text" class="a_nombre"></td>' +
+    '<td><input type="text" class="a_dependencia"></td>' +
+    '<td><select class="a_aprueba"><option value="si">Sí</option><option value="no">No</option></select></td>' +
+    '<td><input type="text" class="a_observacion"></td>' +
+    '<td><input type="text" class="a_firma"></td>' +
+    '<td><button type="button" class="quitar">X</button></td>';
+  tr.querySelector(".a_nombre").value = d.nombre || "";
+  tr.querySelector(".a_dependencia").value = d.dependencia || "";
+  tr.querySelector(".a_aprueba").value = d.aprueba || "si";
+  tr.querySelector(".a_observacion").value = d.observacion || "";
+  tr.querySelector(".a_firma").value = d.firma || "";
+  tr.querySelector(".quitar").onclick = () => tr.remove();
+  document.querySelector("#tablaAsistentes tbody").appendChild(tr);
+}
+
+// ---------- Lectura de imágenes (base64) ----------
+function leerArchivo(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve({
+      nombre: file.name,
+      tipo: file.type,
+      base64: String(r.result).split(",")[1]  // sin el prefijo "data:...;base64,"
+    });
+    r.onerror = () => reject(new Error("No se pudo leer " + file.name));
+    r.readAsDataURL(file);
+  });
+}
+
+// ---------- Recolectar datos del formulario ----------
+function recolectarSinAnexos() {
+  const compromisos = [...document.querySelectorAll("#tablaCompromisos tbody tr")];
+  const asistentes = [...document.querySelectorAll("#tablaAsistentes tbody tr")];
+  const val = (tr, c) => texto(tr.querySelector(c).value);
+
+  const aprueban = asistentes.map(tr => val(tr, ".a_aprueba"));
+  let aprobacion = "Sin asistentes registrados";
+  if (aprueban.length > 0) {
+    aprobacion = aprueban.every(x => x === "si") ? "Aprobadas por todos" : "Hay asistentes que no aprueban";
+  }
+
+  return {
+    Nombre_comite: texto(document.getElementById("nombre_comite").value),
+    ciudad: texto(document.getElementById("ciudad").value),
+    fecha: fechaValida(document.getElementById("fecha").value),
+    hora_inicio: horaValida(document.getElementById("hora_inicio").value),
+    hora_fin: horaValida(document.getElementById("hora_fin").value),
+    lugar_enlace: texto(document.getElementById("lugar_enlace").value),
+    direccion_regional: texto(document.getElementById("direccion_regional").value),
+    agenda: texto(document.getElementById("agenda").value),
+    objetivos_de_reunion: texto(document.getElementById("objetivos_de_reunion").value),
+    desarrollo: texto(document.getElementById("desarrollo").value),
+    conclusiones: texto(document.getElementById("conclusiones").value),
+
+    compromisos_actividad_decision: compromisos.map(tr => val(tr, ".c_actividad")),
+    compromiso_fechas: compromisos.map(tr => fechaValida(val(tr, ".c_fecha"))),
+    compromisos_responsables: compromisos.map(tr => val(tr, ".c_responsable")),
+    compromiso_firma_participacionVirtual: compromisos.map(tr => val(tr, ".c_firma")),
+
+    aprobacion_decisiones: aprobacion,
+    AD_nombre: asistentes.map(tr => val(tr, ".a_nombre")),
+    AD_dependencia_empresa: asistentes.map(tr => val(tr, ".a_dependencia")),
+    AD_aprueba: aprueban,
+    AD_observaciones: asistentes.map(tr => val(tr, ".a_observacion")),
+    AD_firma_ParticipacionVirtual: asistentes.map(tr => val(tr, ".a_firma"))
+  };
+}
+
+// ---------- Validación ----------
+function validar(d) {
+  if (!d.Nombre_comite) return "Falta el nombre del comité o reunión.";
+  if (!d.ciudad) return "Falta la ciudad.";
+  if (!d.fecha) return "La fecha no es válida.";
+  if (!d.hora_inicio) return "Hora de inicio inválida (formato HH:MM).";
+  if (!d.hora_fin) return "Hora de fin inválida (formato HH:MM).";
+  // "HH:MM" en 24 horas se puede comparar directamente como texto
+  if (d.hora_fin < d.hora_inicio) return "La hora fin no puede ser menor que la hora inicio.";
+  return "";
+}
+
+// ---------- Guardar / cargar borrador (localStorage) ----------
+function guardarBorrador() {
+  try {
+    const d = recolectarSinAnexos(); // las imágenes no se guardan en el borrador
+    localStorage.setItem(CLAVE_BORRADOR, JSON.stringify(d));
+    mostrar("Borrador guardado (sin anexos).");
+  } catch (e) {
+    mostrar("No se pudo guardar el borrador: " + e.message);
+  }
+}
+
+function cargarBorrador() {
+  let d;
+  try {
+    d = JSON.parse(localStorage.getItem(CLAVE_BORRADOR));
+  } catch (e) { d = null; }
+  if (!d) { mostrar("No hay borrador guardado."); return; }
+
+  document.getElementById("nombre_comite").value = d.Nombre_comite || "";
+  document.getElementById("ciudad").value = d.ciudad || "";
+  document.getElementById("fecha").value = d.fecha || "";
+  document.getElementById("hora_inicio").value = normalizarHora(d.hora_inicio);
+  document.getElementById("hora_fin").value = normalizarHora(d.hora_fin);
+  document.getElementById("lugar_enlace").value = d.lugar_enlace || "";
+  document.getElementById("direccion_regional").value = d.direccion_regional || "";
+  document.getElementById("agenda").value = d.agenda || "";
+  document.getElementById("objetivos_de_reunion").value = d.objetivos_de_reunion || "";
+  document.getElementById("desarrollo").value = d.desarrollo || "";
+  document.getElementById("conclusiones").value = d.conclusiones || "";
+
+  document.querySelector("#tablaCompromisos tbody").innerHTML = "";
+  (d.compromisos_actividad_decision || []).forEach((_, i) => agregarCompromiso({
+    actividad: d.compromisos_actividad_decision[i],
+    fecha: d.compromiso_fechas[i],
+    responsable: d.compromisos_responsables[i],
+    firma: d.compromiso_firma_participacionVirtual[i]
+  }));
+
+  document.querySelector("#tablaAsistentes tbody").innerHTML = "";
+  (d.AD_nombre || []).forEach((_, i) => agregarAsistente({
+    nombre: d.AD_nombre[i],
+    dependencia: d.AD_dependencia_empresa[i],
+    aprueba: d.AD_aprueba[i],
+    observacion: d.AD_observaciones[i],
+    firma: d.AD_firma_ParticipacionVirtual[i]
+  }));
+  mostrar("Borrador cargado.");
+}
+
+// ---------- Enviar al servidor ----------
+async function enviar(evento) {
+  evento.preventDefault();
+  const datos = recolectarSinAnexos();
+  const error = validar(datos);
+  if (error) { mostrar(error); return; }
+
+  try {
+    const archivos = [...document.getElementById("anexos").files];
+    datos.anexos = await Promise.all(archivos.map(leerArchivo));
+
+    mostrar("Enviando...");
+    const resp = await fetch(URL_ENVIO, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos)
+    });
+    const resultado = await resp.json();
+    if (!resp.ok) throw new Error(resultado.error || "Error del servidor");
+
+    mostrar("Acta enviada correctamente. ID: " + resultado.id);
+    mostrarDescargas(resultado);
+    localStorage.removeItem(CLAVE_BORRADOR);
+  } catch (e) {
+    mostrar("No se pudo enviar: " + e.message);
+  }
+}
+
+// ---------- Descargas ----------
+function mostrarDescargas(resultado) {
+  const cont = document.getElementById("descargas");
+  cont.innerHTML = "";
+
+  const pPdf = document.createElement("p");
+  const aPdf = document.createElement("a");
+  aPdf.href = "/api/actas/" + resultado.id + "/pdf";
+  aPdf.textContent = "Descargar acta en PDF";
+  aPdf.setAttribute("download", "acta_" + resultado.id + ".pdf");
+  pPdf.appendChild(aPdf);
+  cont.appendChild(pPdf);
+
+  if (resultado.anexos && resultado.anexos.length > 0) {
+    const titulo = document.createElement("p");
+    titulo.textContent = "Anexos:";
+    cont.appendChild(titulo);
+    const ul = document.createElement("ul");
+    resultado.anexos.forEach(a => {
+      const li = document.createElement("li");
+      const link = document.createElement("a");
+      link.href = "/api/actas/" + resultado.id + "/anexos/" + a.id;
+      link.textContent = a.nombre;
+      link.setAttribute("download", a.nombre);
+      li.appendChild(link);
+      ul.appendChild(li);
+    });
+    cont.appendChild(ul);
+  }
+}
+
+// ---------- Eventos ----------
+document.getElementById("btnAddCompromiso").onclick = () => agregarCompromiso();
+document.getElementById("btnAddAsistente").onclick = () => agregarAsistente();
+document.getElementById("btnGuardar").onclick = guardarBorrador;
+document.getElementById("btnCargar").onclick = cargarBorrador;
+document.getElementById("formActa").addEventListener("submit", enviar);
+
+// Una fila inicial en cada tabla
+agregarCompromiso();
+agregarAsistente();
+</script>
+</body>
+</html>
