@@ -54,3 +54,19 @@ Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
 ##Layer_003
 
 1. Inicio de sesion 
+
+## Layer_004
+
+## Creacion de usuario principal
+
+1. Se debe iniciar primero "crear_usuario.py" ingresando los datos para iniciar sesion lugo con "app.py" 
+- Recuerda el correo ingresado debe ser nuevo y no estar registrado en la base de datos
+- La contraseña no se muestra al escribir se por lo que se debe tener en concreto que vas a escribir 
+- En la base de datos la contraseña esta cifrada con hash por lo que no podras verla , la contraseña debe ser facil de recordar para ti 
+- Sigue las recomendaciones (ejemplos) dados en el mensaje alado de el campo de ingreso de datos
+
+2. Una vez finalizado al creacion del usuario principal podria acceder al inicio de sesion y ver los clasicos apartados 
+
+3. En la parte de formularios fue lo ultima trabajado al momento de escribir esto , los datos se envian a la base de datos y otra para poder descargar en pdf 
+
+## Fecha de Layer_004 /08 de 11 del 2026
