@@ -1,0 +1,71 @@
+{% extends 'base_app.html' %}
+{% from '_iconos.html' import icono %}
+{% set menu_activo = 'mis_actas' %}
+{% block titulo %}Mis actas | Actas SENA{% endblock %}
+
+{% block contenido %}
+<div class="encabezado-acta">
+  <div>
+    <h1>Mis actas</h1>
+    <p class="sub">Actas que has creado o en las que participas.</p>
+  </div>
+  {% if puede_crear_acta %}
+  <div class="acciones">
+    <a class="btn-primario btn-enlace" href="{{ url_for('actas.crear') }}">+ Crear acta</a>
+  </div>
+  {% endif %}
+</div>
+
+<form class="barra-filtros" method="get" action="{{ url_for('mis_actas') }}">
+  <div class="campo buscador">
+    <label for="q" class="sr-only">Buscar</label>
+    {{ icono('search') }}
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="Buscar por nombre de reunión o número de acta">
+  </div>
+  <div class="campo">
+    <label for="estado" class="sr-only">Estado</label>
+    <select id="estado" name="estado">
+      <option value="">Todos los estados</option>
+      <option value="abierta" {{ 'selected' if estado == 'abierta' }}>Abierta</option>
+      <option value="cerrada" {{ 'selected' if estado == 'cerrada' }}>Cerrada</option>
+    </select>
+  </div>
+  <button type="submit" class="btn-sec btn-filtrar">Filtrar</button>
+</form>
+
+<section class="panel">
+  <header class="panel-cab">
+    <h2>Resultados <small class="contador">({{ actas|length }})</small></h2>
+  </header>
+
+  {% if actas %}
+  <div class="tabla-scroll">
+    <table>
+      <thead>
+        <tr><th>Acta</th><th>Reunión</th><th>Fecha</th><th>Ficha</th><th>Tipo</th><th>Estado</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in actas %}
+        <tr>
+          <td class="fuerte">{{ a.numero_acta }}</td>
+          <td class="fuerte">{{ a.nombre_reunion }}</td>
+          <td>{{ a.fecha_reunion.strftime('%d/%m/%Y') }}</td>
+          <td>{{ a.ficha or '—' }}</td>
+          <td>{{ 'Equipo ejecutor' if a.tipo_acta == 'equipo_ejecutor' else 'Otros asuntos' }}</td>
+          <td><span class="insignia {{ 'verde' if a.estado == 'abierta' else 'azul' }}">{{ a.estado|capitalize }}</span></td>
+          <td><a class="enlace-tabla" href="{{ url_for('actas.ver', acta_id=a.id) }}">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio-ilustrado">
+    <span class="vacio-icono">{{ icono('file-text') }}</span>
+    <h2>No hay actas para mostrar</h2>
+    <p class="sub">Cuando crees una acta o te agreguen como participante, aparecerá aquí.</p>
+    {% if puede_crear_acta %}<a class="btn-primario btn-enlace" href="{{ url_for('actas.crear') }}">Crear nueva acta</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

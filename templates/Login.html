@@ -1,4 +1,15 @@
 {% from '_iconos.html' import icono %}
+{#
+  Para cambiar las fotos del carrusel: copia tus imágenes en static/img/carrusel/
+  y edita esta lista (archivo, título y texto de cada diapositiva).
+  Recomendado: JPG horizontal de 1600 px de ancho o más, menos de 400 KB cada una.
+#}
+{% set diapositivas = [
+  {'archivo': 'carrusel/1.jpg', 'titulo': 'Formación profesional integral', 'texto': 'Aprendices e instructores construyendo el futuro del país.'},
+  {'archivo': 'carrusel/2.jpg', 'titulo': 'Instructores y aprendices',      'texto': 'Cada reunión y cada compromiso quedan registrados en un acta.'},
+  {'archivo': 'carrusel/3.jpg', 'titulo': 'Centros de formación',           'texto': 'Tus actas disponibles donde las necesites, de forma segura.'},
+  {'archivo': 'sede.jpg',       'titulo': 'Nuestras sedes',                 'texto': 'Servicio Nacional de Aprendizaje, presente en todo el territorio.'}
+] %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -7,34 +18,58 @@
   <title>Iniciar sesión | Actas SENA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 </head>
 <body class="pagina-login">
+  <div class="franja-sena" aria-hidden="true"></div>
   <main class="login">
 
-
+    <!-- ===== Panel izquierdo: marca + carrusel ===== -->
     <aside class="login-marca">
       <div class="marca-contenido">
-        <img class="marca-logo" src="{{ url_for('static', filename='img/logo-sena.png') }}" alt=""
-             onerror="this.hidden=true;this.nextElementSibling.hidden=false">
-        <span class="marca-logo-texto" hidden>SENA</span>
+        <img class="marca-logo" src="{{ url_for('static', filename='img/logo-sena-blanco.png') }}" alt="Logo del SENA">
         <h1>Actas SENA</h1>
         <hr>
         <p>Gestiona, organiza y consulta<br>tus actas de forma rápida y segura.</p>
+        <p class="marca-sello">Servicio Nacional de Aprendizaje · Formación profesional integral</p>
       </div>
-      <div class="marca-foto" style="background-image: url('{{ url_for('static', filename='img/sede.jpg') }}')"></div>
+
+      <section class="carrusel" aria-roledescription="carrusel" aria-label="Imágenes del SENA">
+        {% for d in diapositivas %}
+        <figure class="slide {{ 'activa' if loop.first }}" aria-roledescription="diapositiva" aria-label="{{ loop.index }} de {{ diapositivas|length }}">
+          <div class="slide-foto" style="--img: url('{{ url_for('static', filename='img/' ~ d.archivo) }}')"></div>
+          <figcaption class="slide-texto">
+            <h3>{{ d.titulo }}</h3>
+            <p>{{ d.texto }}</p>
+          </figcaption>
+        </figure>
+        {% endfor %}
+
+        <div class="carrusel-ctrl">
+          <div class="carrusel-puntos" role="tablist" aria-label="Elegir imagen">
+            {% for d in diapositivas %}
+            <button type="button" role="tab" aria-label="Ir a la imagen {{ loop.index }}" aria-current="{{ 'true' if loop.first else 'false' }}"></button>
+            {% endfor %}
+          </div>
+          <button type="button" class="carrusel-flecha" data-dir="-1" aria-label="Imagen anterior">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <button type="button" class="carrusel-flecha" data-dir="1" aria-label="Imagen siguiente">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </section>
     </aside>
 
-
+    <!-- ===== Panel derecho: formulario ===== -->
     <section class="login-form">
       <div class="login-caja">
         <h2>Iniciar sesión</h2>
         <p class="login-sub">Ingresa con tu cuenta del SENA</p>
 
-
         <form class="tarjeta-form" method="post" action="{{ url_for('login') }}" novalidate>
-
 
           {% with mensajes = get_flashed_messages() %}
             {% if mensajes %}
@@ -42,11 +77,9 @@
             {% endif %}
           {% endwith %}
 
-
           <label for="correo">{{ icono('user') }} Correo institucional</label>
           <input type="email" id="correo" name="correo" value="{{ correo }}"
                  placeholder="usuario@misena.edu.co" autocomplete="email" required autofocus>
-
 
           <label for="password">{{ icono('lock') }} Contraseña</label>
           <div class="campo-clave">
@@ -57,25 +90,57 @@
             </button>
           </div>
 
-
           <button type="submit" class="btn-primario">Iniciar sesión</button>
         </form>
+
+        <p class="login-pie">© 2026 SENA · <a href="https://www.sena.edu.co" target="_blank" rel="noopener">www.sena.edu.co</a></p>
       </div>
     </section>
 
-
   </main>
 
-
   <script>
-    const campo = document.getElementById('password');
-    const ojo = document.querySelector('.ojo');
-    ojo.addEventListener('click', () => {
-      const mostrar = campo.type === 'password';
-      campo.type = mostrar ? 'text' : 'password';
-      ojo.setAttribute('aria-pressed', mostrar);
-      ojo.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
-    });
+    // Mostrar / ocultar contraseña
+    (function () {
+      var campo = document.getElementById('password');
+      var ojo = document.querySelector('.ojo');
+      ojo.addEventListener('click', function () {
+        var mostrar = campo.type === 'password';
+        campo.type = mostrar ? 'text' : 'password';
+        ojo.setAttribute('aria-pressed', mostrar);
+        ojo.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
+      });
+    })();
+
+    // Carrusel: cambia solo cada 5 s, se pausa al pasar el mouse o enfocar un control
+    (function () {
+      var slides = document.querySelectorAll('.slide');
+      var puntos = document.querySelectorAll('.carrusel-puntos button');
+      var caja = document.querySelector('.carrusel');
+      if (!slides.length) return;
+      var actual = 0, timer = null;
+      var reducir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function ir(n) {
+        slides[actual].classList.remove('activa');
+        puntos[actual].setAttribute('aria-current', 'false');
+        actual = (n + slides.length) % slides.length;
+        slides[actual].classList.add('activa');
+        puntos[actual].setAttribute('aria-current', 'true');
+      }
+      function iniciar() { if (!reducir && slides.length > 1) timer = setInterval(function () { ir(actual + 1); }, 5000); }
+      function parar() { clearInterval(timer); }
+
+      document.querySelectorAll('.carrusel-flecha').forEach(function (b) {
+        b.addEventListener('click', function () { ir(actual + Number(b.dataset.dir)); });
+      });
+      puntos.forEach(function (p, i) { p.addEventListener('click', function () { ir(i); }); });
+      caja.addEventListener('mouseenter', parar);
+      caja.addEventListener('mouseleave', iniciar);
+      caja.addEventListener('focusin', parar);
+      caja.addEventListener('focusout', iniciar);
+      iniciar();
+    })();
   </script>
 </body>
 </html>

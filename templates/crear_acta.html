@@ -15,7 +15,7 @@
 
 <form class="acta-form" method="post" action="{{ url_for('actas.crear') }}">
 
-  <section class="panel">
+  <section class="panel panel-formulario">
     <header class="panel-cab"><h2>Tipo de acta</h2></header>
     <div class="opciones-tipo">
       {% if puede_equipo %}
@@ -55,7 +55,7 @@
     {% endif %}
   </section>
 
-  <section class="panel">
+  <section class="panel panel-formulario">
     <header class="panel-cab"><h2>Datos generales</h2></header>
     <p class="nota-numero">El número de acta se asigna automáticamente al guardar (consecutivo por centro, ficha y año).</p>
 
@@ -111,7 +111,7 @@
     </div>
   </section>
 
-  <section class="panel">
+  <section class="panel panel-formulario">
     <header class="panel-cab"><h2>Agenda y objetivos</h2></header>
 
     <div class="lista-dinamica" data-nombre="agenda" data-placeholder="Punto a desarrollar">
@@ -141,9 +141,9 @@
     </div>
   </section>
 
-  <div class="acciones">
-    <button type="submit" class="btn-primario">Guardar y abrir acta</button>
+  <div class="acciones acciones-form">
     <a class="btn-sec" href="{{ url_for('inicio') }}">Cancelar</a>
+    <button type="submit" class="btn-primario">Guardar y abrir acta</button>
   </div>
 </form>
 {% endblock %}

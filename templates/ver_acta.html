@@ -1,4 +1,5 @@
 {% extends 'base_app.html' %}
+{% from '_iconos.html' import icono %}
 {% set menu_activo = 'crear' %}
 {% block titulo %}{{ acta.numero_acta }} | Actas SENA{% endblock %}
 
@@ -19,12 +20,19 @@
     {% if acta.lider_id == session.usuario_id %}
     <a class="btn-sec" href="{{ url_for('agenda_objetivos', acta_id=acta.id) }}">Editar agenda y objetivos</a>
     {% endif %}
-    <span class="insignia {{ 'verde' if acta.estado == 'abierta' else 'azul' }}">{{ acta.estado|capitalize }}</span>
+  </div>
+</div>
+
+<div class="tarjeta-estado {{ 'verde' if acta.estado == 'abierta' else 'azul' }}">
+  <span class="estado-icono">{{ icono('check-circle' if acta.estado == 'abierta' else 'lock') }}</span>
+  <div>
+    <strong>{{ acta.estado|capitalize }}</strong>
+    <small>{{ 'Los participantes pueden registrar su aporte.' if acta.estado == 'abierta' else 'El acta ya no admite cambios.' }}</small>
   </div>
 </div>
 
 <section class="panel">
-  <header class="panel-cab"><h2>Datos generales</h2></header>
+  <header class="panel-cab"><h2><span class="icono-titulo">{{ icono('file-text') }}</span> Datos generales</h2></header>
   <dl class="datos">
     <div><dt>Tipo de acta</dt><dd>{{ 'Equipo ejecutor' if acta.tipo_acta == 'equipo_ejecutor' else 'Otros asuntos' }}</dd></div>
     {% if acta.ficha %}
@@ -53,7 +61,7 @@
 </div>
 
 <section class="panel">
-  <header class="panel-cab"><h2>Participantes</h2></header>
+  <header class="panel-cab"><h2><span class="icono-titulo">{{ icono('users') }}</span> Participantes</h2></header>
   <div class="tabla-scroll">
     <table>
       <thead><tr><th>Nombre</th><th>Rol</th><th>Aporte</th></tr></thead>
@@ -72,7 +80,7 @@
 </section>
 
 <section class="panel" id="adjuntos">
-  <header class="panel-cab"><h2>Adjuntos y soportes <small>({{ adjuntos|length }})</small></h2></header>
+  <header class="panel-cab"><h2><span class="icono-titulo">{{ icono('clip') }}</span> Adjuntos y soportes <small>({{ adjuntos|length }})</small></h2></header>
 
   {% if adjuntos %}
   <ul class="adjuntos">
@@ -93,7 +101,7 @@
       </div>
       {% if puede_gestionar_adjuntos and (a.usuario_id == session.usuario_id or acta.lider_id == session.usuario_id) %}
       <form method="post" action="{{ url_for('actas.eliminar_adjunto', acta_id=acta.id, adjunto_id=a.id) }}"
-            onsubmit="return confirm('¿Quitar este archivo del acta?');">
+            data-confirmar="¿Quitar este archivo del acta?" data-detalle="{{ a.nombre_original }}">
         <button type="submit" class="quitar" aria-label="Quitar {{ a.nombre_original }}">×</button>
       </form>
       {% endif %}
@@ -122,6 +130,35 @@
 </section>
 {% endblock %}
 {% block scripts %}
+<script>
+  // Ventana de confirmación (reemplaza al confirm() del navegador)
+  (function () {
+    document.querySelectorAll('form[data-confirmar]').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        if (form.dataset.ok) return;
+        e.preventDefault();
+        var fondo = document.createElement('div');
+        fondo.className = 'modal-fondo';
+        fondo.innerHTML =
+          '<div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="modal-t">' +
+          '<span class="modal-icono aviso" aria-hidden="true">!</span>' +
+          '<h2 id="modal-t"></h2><p></p>' +
+          '<div class="modal-acciones"><button type="button" class="btn-sec" data-no>Cancelar</button>' +
+          '<button type="button" class="btn-primario" data-si>Confirmar</button></div></div>';
+        fondo.querySelector('h2').textContent = form.dataset.confirmar;
+        fondo.querySelector('p').textContent = form.dataset.detalle || '';
+        function cerrar() { fondo.remove(); document.removeEventListener('keydown', tecla); }
+        function tecla(ev) { if (ev.key === 'Escape') cerrar(); }
+        fondo.querySelector('[data-no]').addEventListener('click', cerrar);
+        fondo.addEventListener('click', function (ev) { if (ev.target === fondo) cerrar(); });
+        fondo.querySelector('[data-si]').addEventListener('click', function () { form.dataset.ok = '1'; form.submit(); });
+        document.addEventListener('keydown', tecla);
+        document.body.appendChild(fondo);
+        fondo.querySelector('[data-no]').focus();
+      });
+    });
+  })();
+</script>
 {% if puede_adjuntar %}
 <script>
   // Aviso inmediato; el servidor vuelve a validar todo.

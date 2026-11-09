@@ -1,0 +1,41 @@
+{% extends 'base_app.html' %}
+{% from '_iconos.html' import icono %}
+{# DATOS DE EJEMPLO: la tabla de compromisos aún no existe en la BD. Reemplaza la lista en secciones.py por una consulta real. #}
+{% set menu_activo = 'compromisos' %}
+{% block titulo %}Compromisos | Actas SENA{% endblock %}
+
+{% block contenido %}
+<h1>Compromisos</h1>
+<p class="sub">Tareas acordadas en las actas, con responsable y fecha límite.</p>
+
+<nav class="pestanas" aria-label="Filtrar por estado">
+  {% for clave, etiqueta in [('todos', 'Todos'), ('pendiente', 'Pendientes'), ('completado', 'Completados')] %}
+  <a href="{{ url_for('compromisos', estado=clave) }}" class="{{ 'activa' if filtro == clave }}" {{ 'aria-current=page' if filtro == clave }}>
+    {{ etiqueta }} <span class="contador">{{ conteos[clave] }}</span>
+  </a>
+  {% endfor %}
+</nav>
+
+<section class="panel">
+  {% if compromisos %}
+  <ul class="compromisos compromisos-grande">
+    {% for c in compromisos %}
+    <li>
+      <span class="dato-icono {{ c.color }}">{{ icono(c.icono) }}</span>
+      <div class="compromiso-texto">
+        <p class="fuerte">{{ c.titulo }}</p>
+        <p class="fecha">Acta {{ c.acta }} · Responsable: {{ c.responsable }}</p>
+      </div>
+      <div class="compromiso-fecha">
+        <small>Fecha límite</small>
+        <strong>{{ c.fecha }}</strong>
+      </div>
+      <span class="insignia {{ c.clase }}">{{ c.estado }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="vacio"><p class="fuerte">No hay compromisos en esta categoría.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

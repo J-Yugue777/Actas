@@ -1,0 +1,176 @@
+/* Estilos de las secciones del menú lateral (se carga después de style.css y actas.css) */
+
+/* Botón con aspecto de botón primario pero como enlace */
+.btn-enlace {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  padding: 0.8rem 1.4rem;
+  color: #fff;
+  text-decoration: none;
+  text-align: center;
+}
+
+/* Barra de búsqueda y filtros */
+.barra-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  padding: 0.8rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+}
+
+.barra-filtros .campo { margin: 0; }
+.barra-filtros .buscador { flex: 1 1 18rem; }
+
+.barra-filtros input,
+.barra-filtros select {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--texto);
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+}
+
+.barra-filtros input:focus-visible,
+.barra-filtros select:focus-visible {
+  outline: none;
+  background: #fff;
+  border-color: var(--verde-sena);
+  box-shadow: var(--anillo);
+}
+
+.btn-filtrar { font: inherit; font-size: 0.88rem; cursor: pointer; }
+
+.contador { font-weight: 700; color: var(--texto-suave); }
+
+/* Enlaces dentro de tablas */
+.enlace-tabla {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  font-weight: 700;
+  color: var(--verde-texto);
+  text-decoration: none;
+  border: 1.5px solid var(--verde-sena);
+  border-radius: 999px;
+}
+.enlace-tabla:hover { color: #fff; background: var(--verde); border-color: var(--verde); }
+
+/* Estado vacío */
+.vacio { padding: 2.5rem 1rem; text-align: center; }
+.vacio .sub { margin-top: 0.25rem; }
+.vacio-celda { padding: 1.5rem 0.6rem; text-align: center; color: var(--texto-suave); }
+
+/* Persona con avatar */
+.persona { display: inline-flex; align-items: center; gap: 0.6rem; }
+.avatar-sm { width: 1.9rem; height: 1.9rem; font-size: 0.68rem; flex: none; }
+
+/* Resumen de 3 tarjetas */
+.resumen-3 { grid-template-columns: repeat(3, 1fr); margin-top: 1.25rem; }
+
+/* Pestañas */
+.pestanas {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 1.25rem 0 1rem;
+  padding: 0.3rem;
+  background: #e6eeea;
+  border-radius: 12px;
+}
+
+.pestanas a {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--texto-suave);
+  text-decoration: none;
+  border-radius: 9px;
+}
+
+.pestanas a:hover { color: var(--azul-titulo); }
+.pestanas a.activa { color: var(--verde-texto); background: #fff; box-shadow: var(--sombra); }
+.pestanas a:focus-visible { outline: none; box-shadow: var(--anillo); }
+
+/* Lista de compromisos (versión ancha) */
+.compromisos-grande li { flex-wrap: wrap; }
+.compromisos-grande .compromiso-texto { font-size: 0.9rem; }
+
+.compromiso-fecha {
+  display: grid;
+  text-align: right;
+  font-size: 0.82rem;
+  color: var(--azul-titulo);
+}
+
+.compromiso-fecha small { color: var(--texto-suave); font-size: 0.72rem; }
+
+/* Reportes: barras horizontales hechas solo con CSS */
+.barras { display: grid; gap: 0.6rem; }
+
+.barras li {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 2rem;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.8rem;
+}
+
+.barra-etiqueta { font-weight: 600; color: var(--texto-suave); }
+.barra-pista { height: 0.75rem; overflow: hidden; background: #e8efeb; border-radius: 999px; }
+.barra-relleno {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--verde-sena), #6fd43a);
+  border-radius: 999px;
+}
+.barra-valor { font-weight: 700; color: var(--azul-titulo); text-align: right; }
+
+/* Configuración */
+.form-clave { max-width: 26rem; margin-top: 0; }
+.form-clave .acciones .btn-primario { margin: 0; }
+
+code {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.85em;
+  color: var(--verde-texto);
+  background: var(--verde-claro);
+  border-radius: 5px;
+}
+
+@media (max-width: 1000px) {
+  .resumen-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 800px) {
+  .barra-filtros { align-items: stretch; }
+  .barra-filtros .campo, .btn-filtrar { flex: 1 1 100%; }
+  .compromiso-fecha { text-align: left; }
+}
+
+@media (max-width: 480px) {
+  .resumen-3 { grid-template-columns: 1fr; }
+}
+
+
+/* ---- Rediseño: buscador con ícono y estado vacío ---- */
+.buscador { position: relative; }
+.buscador .icono { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: var(--texto-suave); pointer-events: none; }
+.buscador input { padding-left: 2.6rem; }
+
+.vacio-ilustrado { display: grid; justify-items: center; gap: 0.5rem; padding: 3rem 1rem; text-align: center; }
+.vacio-ilustrado .vacio-icono {
+  display: grid; place-items: center; width: 4.5rem; height: 4.5rem; margin-bottom: 0.5rem;
+  color: var(--verde-texto); background: var(--verde-claro); border-radius: 50%;
+}
+.vacio-ilustrado .vacio-icono .icono { width: 2.1rem; height: 2.1rem; }
+.vacio-ilustrado h2 { font-size: 1.4rem; color: var(--azul-titulo); }
+.vacio-ilustrado .btn-primario { margin-top: 0.8rem; }

@@ -12,15 +12,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/actas.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/secciones.css') }}">
 </head>
 <body class="pagina-inicio">
+  <div class="franja-sena" aria-hidden="true"></div>
   <div class="app">
 
     <aside class="lateral">
       <div class="lateral-logo">
-        <img src="{{ url_for('static', filename='img/logo-sena.png') }}" alt=""
+        <img src="{{ url_for('static', filename='img/logo-sena-blanco.png') }}" alt=""
              onerror="this.hidden=true;this.nextElementSibling.hidden=false">
         <span class="marca-logo-texto" hidden>SENA</span>
+        <p class="lateral-lema">Servicio Nacional<br>de Aprendizaje</p>
       </div>
 
       <nav class="menu" aria-label="Principal">
@@ -28,13 +31,18 @@
         {% if puede_crear_acta %}
         <a href="{{ url_for('actas.crear') }}" class="{{ 'activo' if menu_activo == 'crear' }}">{{ icono('file-plus') }} Crear acta</a>
         {% endif %}
-        <a href="#">{{ icono('folder') }} Mis actas</a>
-        <a href="#">{{ icono('users') }} Asistentes</a>
-        <a href="#">{{ icono('clipboard') }} Compromisos</a>
-        <a href="#">{{ icono('user-circle') }} Usuarios</a>
-        <a href="#">{{ icono('chart') }} Reportes</a>
-        <a href="#">{{ icono('sliders') }} Configuración</a>
+        <a href="{{ url_for('mis_actas') }}" class="{{ 'activo' if menu_activo == 'mis_actas' }}">{{ icono('folder') }} Mis actas</a>
+        <a href="{{ url_for('asistentes') }}" class="{{ 'activo' if menu_activo == 'asistentes' }}">{{ icono('users') }} Asistentes</a>
+        <a href="{{ url_for('compromisos') }}" class="{{ 'activo' if menu_activo == 'compromisos' }}">{{ icono('clipboard') }} Compromisos</a>
+        <a href="{{ url_for('usuarios') }}" class="{{ 'activo' if menu_activo == 'usuarios' }}">{{ icono('user-circle') }} Usuarios</a>
+        <a href="{{ url_for('reportes') }}" class="{{ 'activo' if menu_activo == 'reportes' }}">{{ icono('chart') }} Reportes</a>
+        <a href="{{ url_for('configuracion') }}" class="{{ 'activo' if menu_activo == 'configuracion' }}">{{ icono('sliders') }} Configuración</a>
       </nav>
+
+      <div class="lateral-usuario">
+        <span class="avatar">{{ iniciales }}</span>
+        <div><strong>{{ session.nombre }}</strong><small>{{ session.rol }}</small></div>
+      </div>
 
       <form class="menu-salir" method="post" action="{{ url_for('logout') }}">
         <button type="submit">{{ icono('logout') }} Cerrar sesión</button>
@@ -43,6 +51,10 @@
 
     <div class="contenido">
       <header class="barra">
+        <button type="button" class="barra-menu" aria-label="Mostrar u ocultar el menú">
+          <svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div class="barra-titulo"><strong>Actas SENA</strong><span>Formación profesional integral</span></div>
         <button type="button" class="barra-campana" aria-label="Notificaciones">{{ icono('bell') }}</button>
         <div class="usuario">
           <span class="avatar">{{ iniciales }}</span>
@@ -54,9 +66,31 @@
       <main class="principal">
         {% block contenido %}{% endblock %}
       </main>
+
+      <footer class="pie-sena">
+        <span class="pie-marca">SENA</span>
+        <span>Servicio Nacional de Aprendizaje · Formación profesional integral</span>
+        <a href="https://www.sena.edu.co" target="_blank" rel="noopener">www.sena.edu.co</a>
+      </footer>
     </div>
 
   </div>
+  <div class="lateral-velo" hidden></div>
+  <script>
+    (function () {
+      var b = document.body, velo = document.querySelector('.lateral-velo');
+      var movil = function () { return window.matchMedia('(max-width: 900px)').matches; };
+      try { if (!movil() && localStorage.getItem('menu') === 'oculto') b.classList.add('menu-oculto'); } catch (e) {}
+      document.querySelector('.barra-menu').addEventListener('click', function () {
+        if (movil()) { b.classList.toggle('menu-abierto'); velo.hidden = !b.classList.contains('menu-abierto'); }
+        else {
+          b.classList.toggle('menu-oculto');
+          try { localStorage.setItem('menu', b.classList.contains('menu-oculto') ? 'oculto' : 'visible'); } catch (e) {}
+        }
+      });
+      velo.addEventListener('click', function () { b.classList.remove('menu-abierto'); velo.hidden = true; });
+    })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

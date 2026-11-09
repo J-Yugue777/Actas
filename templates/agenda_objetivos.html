@@ -1,0 +1,52 @@
+{% extends 'base_app.html' %}
+{% from '_iconos.html' import icono %}
+{% set menu_activo = 'mis_actas' %}
+{% block titulo %}Agenda y objetivos | Actas SENA{% endblock %}
+
+{% block contenido %}
+<div class="encabezado-acta">
+  <div>
+    <h1>Agenda y objetivos</h1>
+    <p class="sub">Agrega o quita los puntos de la agenda y los objetivos de la reunión.</p>
+  </div>
+  <div class="acciones">
+    <a class="btn-sec" href="{{ url_for('actas.ver', acta_id=acta_id) }}">Volver al acta</a>
+  </div>
+</div>
+
+{% with mensajes = get_flashed_messages() %}
+  {% for m in mensajes %}<div class="alerta" role="alert">{{ m }}</div>{% endfor %}
+{% endwith %}
+
+<div class="paneles items-paneles">
+  {% for tipo, titulo, ayuda in [('agenda', 'Agenda / puntos a desarrollar', 'Temas que se tratarán en la reunión.'),
+                                 ('objetivo', 'Objetivos de la reunión', 'Lo que se espera lograr.')] %}
+  <section class="panel" id="{{ tipo }}">
+    <header class="panel-cab"><h2>{{ titulo }}</h2></header>
+    <p class="item-ayuda">{{ ayuda }}</p>
+
+    {% if items[tipo] %}
+    <ul class="items-lista">
+      {% for it in items[tipo] %}
+      <li>
+        <span class="item-texto">{{ it.descripcion }}</span>
+        <form method="post" action="{{ url_for('eliminar_item_acta', acta_id=acta_id, item_id=it.id) }}">
+          <button type="submit" class="item-quitar" aria-label="Quitar: {{ it.descripcion }}">{{ icono('x-circle') }} Quitar</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="items-vacio">Aún no hay elementos.</p>
+    {% endif %}
+
+    <form class="item-nuevo" method="post" action="{{ url_for('agregar_item_acta', acta_id=acta_id) }}">
+      <input type="hidden" name="tipo" value="{{ tipo }}">
+      <label for="desc-{{ tipo }}" class="sr-only">Nuevo elemento</label>
+      <input type="text" id="desc-{{ tipo }}" name="descripcion" maxlength="{{ max_largo }}" placeholder="Escribe y presiona Agregar" required>
+      <button type="submit" class="btn-primario">Agregar</button>
+    </form>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

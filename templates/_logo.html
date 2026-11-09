@@ -1,0 +1,16 @@
+{# Logo SENA. variante: "blanco" (sobre verde) o "color" (fondos claros).
+   Busca static/img/logo-sena-<variante>.png y luego .svg; si no existen, muestra el emblema de respaldo. #}
+{% macro logo(variante='color', grande=false) -%}
+<span class="logo-sena {{ variante }}{{ ' grande' if grande }}">
+  <img class="logo-sena-img" src="{{ url_for('static', filename='img/logo-sena-' ~ variante ~ '.png') }}" alt="SENA"
+       onerror="if(!this.dataset.svg){this.dataset.svg=1;this.src=this.src.replace('.png','.svg')}else{this.hidden=true;this.nextElementSibling.hidden=false}">
+  <span class="logo-sena-alt" hidden role="img" aria-label="SENA">
+    <svg class="logo-sena-marca" viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="{{ '#ffffff' if variante == 'blanco' else '#39a900' }}"/>
+      <path d="M33.5 12c-9.5.2-17 5.4-17 13.2 0 2.2.7 4.1 1.9 5.6C16.4 27 17.4 21 24.5 17c-4.2 3.6-6.3 8-5.9 14 2.2 1.5 4.7 2.2 7.2 2 7.6-.7 10.6-9 7.7-21z"
+            fill="{{ '#39a900' if variante == 'blanco' else '#ffffff' }}"/>
+    </svg>
+    <span class="logo-sena-texto">SENA<small>Servicio Nacional de Aprendizaje</small></span>
+  </span>
+</span>
+{%- endmacro %}

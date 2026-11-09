@@ -1,0 +1,74 @@
+/* =========================================================
+   Login · carrusel de imágenes (se carga después de style.css)
+   Las fotos se tiñen de verde SENA para que combinen con el fondo.
+   ========================================================= */
+.login-marca { min-height: 100vh; }
+
+.carrusel {
+  position: relative; z-index: 1; flex: 1; min-height: 16rem; overflow: hidden;
+  background: var(--verde-menu);
+}
+
+/* Cada diapositiva: foto + tinte verde + texto */
+.slide {
+  position: absolute; inset: 0; margin: 0;
+  display: flex; align-items: flex-end;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.9s ease, visibility 0s 0.9s;
+}
+.slide.activa { opacity: 1; visibility: visible; transition: opacity 0.9s ease; }
+
+.slide-foto {
+  position: absolute; inset: 0;
+  background-image: var(--img);
+  background-size: cover; background-position: center;
+  filter: grayscale(0.7) contrast(1.05);          /* quita colores ajenos a la paleta */
+  transform: scale(1.04);
+}
+.slide.activa .slide-foto { animation: acercar 7s ease-out forwards; }
+@keyframes acercar { to { transform: scale(1.12); } }
+
+/* Tinte verde: oscuro abajo (para leer el texto) y más suave arriba */
+.slide::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(to top, rgba(8, 52, 31, 0.95) 0%, rgba(11, 74, 44, 0.55) 55%, rgba(11, 74, 44, 0.78) 100%);
+  mix-blend-mode: multiply;
+}
+.slide::before {  /* segunda capa verde normal para unificar el tono */
+  content: ""; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(to top, rgba(11, 74, 44, 0.85), rgba(15, 97, 57, 0.35));
+}
+
+.slide-texto { position: relative; z-index: 2; padding: 0 2.5rem 4.2rem; color: #fff; text-align: left; max-width: 30rem; }
+.slide-texto h3 { font-family: "Montserrat", sans-serif; font-size: 1.35rem; font-weight: 800; }
+.slide-texto h3::before {
+  content: ""; display: block; width: 2.4rem; height: 4px; margin-bottom: 0.7rem; border-radius: 4px;
+  background: linear-gradient(90deg, var(--amarillo-sena), var(--verde-sena));
+}
+.slide-texto p { margin-top: 0.35rem; font-size: 0.9rem; color: #dff2e5; }
+
+/* Controles */
+.carrusel-ctrl { position: absolute; z-index: 3; left: 2.5rem; right: 2.5rem; bottom: 1.4rem; display: flex; align-items: center; gap: 0.6rem; }
+.carrusel-puntos { display: flex; gap: 0.45rem; margin-right: auto; }
+.carrusel-puntos button {
+  width: 0.6rem; height: 0.6rem; padding: 0; cursor: pointer; border: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4); transition: width 0.25s, background 0.25s;
+}
+.carrusel-puntos button[aria-current="true"] { width: 1.8rem; background: var(--amarillo-sena); }
+.carrusel-flecha {
+  display: grid; place-items: center; width: 2.2rem; height: 2.2rem; padding: 0; cursor: pointer;
+  color: #fff; background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 50%;
+  transition: background 0.15s;
+}
+.carrusel-flecha:hover { background: rgba(255, 255, 255, 0.28); }
+.carrusel-flecha svg { width: 1rem; height: 1rem; }
+.carrusel-puntos button:focus-visible, .carrusel-flecha:focus-visible { outline: 3px solid var(--amarillo-sena); outline-offset: 2px; }
+
+@media (max-width: 800px) {
+  .carrusel { display: none; }   /* en móvil solo se ve el formulario */
+}
+@media (prefers-reduced-motion: reduce) {
+  .slide, .slide.activa { transition: none; }
+  .slide.activa .slide-foto { animation: none; transform: none; }
+}

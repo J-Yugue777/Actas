@@ -1,0 +1,61 @@
+{% extends 'base_app.html' %}
+{% from '_iconos.html' import icono %}
+{% set menu_activo = 'asistentes' %}
+{% block titulo %}Asistentes | Actas SENA{% endblock %}
+
+{% block contenido %}
+<h1>Asistentes</h1>
+<p class="sub">Personas que han participado en tus actas y su nivel de aporte.</p>
+
+<section class="resumen resumen-3" aria-label="Resumen">
+  <article class="dato">
+    <span class="dato-icono azul">{{ icono('users') }}</span>
+    <div><p class="dato-titulo">Asistentes</p><p class="dato-valor azul">{{ asistentes|length }}</p></div>
+  </article>
+  <article class="dato">
+    <span class="dato-icono verde">{{ icono('check-circle') }}</span>
+    <div><p class="dato-titulo">Con aporte registrado</p><p class="dato-valor verde">{{ con_aporte }}</p></div>
+  </article>
+  <article class="dato">
+    <span class="dato-icono amarillo">{{ icono('clock') }}</span>
+    <div><p class="dato-titulo">Pendientes</p><p class="dato-valor amarillo">{{ asistentes|length - con_aporte }}</p></div>
+  </article>
+</section>
+
+<form class="barra-filtros" method="get" action="{{ url_for('asistentes') }}">
+  <div class="campo buscador">
+    <label for="q" class="sr-only">Buscar</label>
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="Buscar por nombre o correo">
+  </div>
+  <button type="submit" class="btn-sec btn-filtrar">Buscar</button>
+</form>
+
+<section class="panel">
+  <header class="panel-cab"><h2>Listado de asistentes</h2></header>
+  {% if asistentes %}
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Nombre</th><th>Rol</th><th>Correo</th><th>Actas</th><th>Aportes</th></tr></thead>
+      <tbody>
+        {% for p in asistentes %}
+        <tr>
+          <td>
+            <span class="persona">
+              <span class="avatar avatar-sm">{{ (p.nombre[:1] ~ p.apellido[:1])|upper }}</span>
+              <span class="fuerte">{{ p.nombre }} {{ p.apellido }}</span>
+            </span>
+          </td>
+          <td>{{ p.rol }}</td>
+          <td>{{ p.correo }}</td>
+          <td>{{ p.total_actas }}</td>
+          <td><span class="insignia {{ 'verde' if p.aportes == p.total_actas else 'amarillo' }}">{{ p.aportes }} / {{ p.total_actas }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p class="fuerte">Aún no hay asistentes.</p><p class="sub">Aparecerán cuando tus actas tengan participantes.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

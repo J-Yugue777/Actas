@@ -1,0 +1,60 @@
+{% extends 'base_app.html' %}
+{% set menu_activo = 'usuarios' %}
+{% block titulo %}Usuarios | Actas SENA{% endblock %}
+
+{% block contenido %}
+<div class="encabezado-acta">
+  <div>
+    <h1>Usuarios</h1>
+    <p class="sub">Cuentas registradas en el sistema y su rol.</p>
+  </div>
+</div>
+
+<form class="barra-filtros" method="get" action="{{ url_for('usuarios') }}">
+  <div class="campo buscador">
+    <label for="q" class="sr-only">Buscar</label>
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="Buscar por nombre o correo">
+  </div>
+  <div class="campo">
+    <label for="rol" class="sr-only">Rol</label>
+    <select id="rol" name="rol">
+      <option value="">Todos los roles</option>
+      {% for r in roles %}
+      <option value="{{ r.nombre }}" {{ 'selected' if rol_filtro == r.nombre }}>{{ r.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="btn-sec btn-filtrar">Filtrar</button>
+</form>
+
+<section class="panel">
+  <header class="panel-cab"><h2>Listado <small class="contador">({{ usuarios|length }})</small></h2></header>
+  <div class="tabla-scroll">
+    <table>
+      <thead>
+        <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Vinculación</th><th>Teléfono</th><th>Estado</th></tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td>
+            <span class="persona">
+              <span class="avatar avatar-sm">{{ (u.nombre[:1] ~ u.apellido[:1])|upper }}</span>
+              <span class="fuerte">{{ u.nombre }} {{ u.apellido }}</span>
+            </span>
+          </td>
+          <td>{{ u.correo }}</td>
+          <td>{{ u.rol }}</td>
+          <td>{{ u.tipo_vinculacion or '—' }}</td>
+          <td>{{ u.telefono or '—' }}</td>
+          <td><span class="insignia {{ 'verde' if u.activo else 'rojo' }}">{{ 'Activo' if u.activo else 'Inactivo' }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="vacio-celda">No hay usuarios con esos filtros.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="nota-numero">Para crear usuarios nuevos usa el script <code>crear_usuario.py</code>.</p>
+</section>
+{% endblock %}

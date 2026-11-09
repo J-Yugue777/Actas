@@ -1,0 +1,65 @@
+{% extends 'base_app.html' %}
+{% from '_iconos.html' import icono %}
+{% set menu_activo = 'reportes' %}
+{% block titulo %}Reportes | Actas SENA{% endblock %}
+
+{% block contenido %}
+<h1>Reportes</h1>
+<p class="sub">Indicadores generales de las actas del sistema.</p>
+
+<section class="resumen" aria-label="Resumen">
+  <article class="dato">
+    <span class="dato-icono verde">{{ icono('file-text') }}</span>
+    <div><p class="dato-titulo">Total de actas</p><p class="dato-valor verde">{{ total }}</p></div>
+  </article>
+  <article class="dato">
+    <span class="dato-icono azul">{{ icono('folder') }}</span>
+    <div><p class="dato-titulo">Abiertas</p><p class="dato-valor azul">{{ abiertas }}</p></div>
+  </article>
+  <article class="dato">
+    <span class="dato-icono amarillo">{{ icono('clipboard') }}</span>
+    <div><p class="dato-titulo">Cerradas</p><p class="dato-valor">{{ total - abiertas }}</p></div>
+  </article>
+  <article class="dato">
+    <span class="dato-icono morado">{{ icono('users') }}</span>
+    <div><p class="dato-titulo">Participantes</p><p class="dato-valor">{{ participantes }}</p></div>
+  </article>
+</section>
+
+<div class="paneles paneles-iguales">
+  <section class="panel">
+    <header class="panel-cab"><h2>Actas por mes ({{ anio }})</h2></header>
+    {% if por_mes|sum(attribute='n') > 0 %}
+    <ul class="barras" aria-label="Actas por mes">
+      {% for m in por_mes %}
+      <li>
+        <span class="barra-etiqueta">{{ m.mes }}</span>
+        <span class="barra-pista"><span class="barra-relleno" style="width: {{ (m.n / maximo * 100)|round|int }}%"></span></span>
+        <span class="barra-valor">{{ m.n }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="vacio"><p class="sub">Aún no hay actas este año.</p></div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <header class="panel-cab"><h2>Actas por centro de formación</h2></header>
+    {% if por_centro %}
+    <div class="tabla-scroll">
+      <table>
+        <thead><tr><th>Centro</th><th>Actas</th></tr></thead>
+        <tbody>
+          {% for c in por_centro %}
+          <tr><td class="fuerte">{{ c.centro }}</td><td>{{ c.n }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="vacio"><p class="sub">Sin datos todavía.</p></div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

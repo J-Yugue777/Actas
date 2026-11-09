@@ -1,0 +1,49 @@
+{% extends 'base_app.html' %}
+{% set menu_activo = 'configuracion' %}
+{% block titulo %}Configuración | Actas SENA{% endblock %}
+
+{% block contenido %}
+{% for mensaje in get_flashed_messages(category_filter=['ok']) %}
+  <div class="aviso-ok" role="status">{{ mensaje }}</div>
+{% endfor %}
+{% for mensaje in get_flashed_messages(category_filter=['error']) %}
+  <div class="alerta" role="alert">{{ mensaje }}</div>
+{% endfor %}
+
+<h1>Configuración</h1>
+<p class="sub">Tu perfil y la seguridad de tu cuenta.</p>
+
+<section class="panel">
+  <header class="panel-cab"><h2>Mi perfil</h2></header>
+  <dl class="datos">
+    <div><dt>Nombre</dt><dd>{{ perfil.nombre }} {{ perfil.apellido }}</dd></div>
+    <div><dt>Correo</dt><dd>{{ perfil.correo }}</dd></div>
+    <div><dt>Rol</dt><dd>{{ perfil.rol }}</dd></div>
+    <div><dt>Tipo de vinculación</dt><dd>{{ perfil.tipo_vinculacion or '—' }}</dd></div>
+    <div><dt>Teléfono</dt><dd>{{ perfil.telefono or '—' }}</dd></div>
+    <div><dt>Dirección</dt><dd>{{ perfil.direccion or '—' }}</dd></div>
+  </dl>
+</section>
+
+<section class="panel">
+  <header class="panel-cab"><h2>Cambiar contraseña</h2></header>
+  <form class="acta-form form-clave" method="post" action="{{ url_for('cambiar_password') }}">
+    <div class="campo">
+      <label for="actual">Contraseña actual</label>
+      <input type="password" id="actual" name="actual" autocomplete="current-password" required>
+    </div>
+    <div class="campo">
+      <label for="nueva">Nueva contraseña</label>
+      <input type="password" id="nueva" name="nueva" autocomplete="new-password" minlength="8" required>
+      <small class="ayuda">Mínimo 8 caracteres.</small>
+    </div>
+    <div class="campo">
+      <label for="confirmar">Confirmar nueva contraseña</label>
+      <input type="password" id="confirmar" name="confirmar" autocomplete="new-password" minlength="8" required>
+    </div>
+    <div class="acciones">
+      <button type="submit" class="btn-primario">Guardar contraseña</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
