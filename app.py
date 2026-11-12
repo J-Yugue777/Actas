@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import Flask, request, jsonify, render_template, session, url_for, redirect, flash, abort
+from flask import Blueprint, Flask, request, jsonify, render_template, session, url_for, redirect, flash, abort
 import psycopg2
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
@@ -22,8 +22,9 @@ from db import (
     acta_del_lider, listar_items, agregar_item, eliminar_item,
     TIPOS_ITEM, MAX_LARGO_ITEM,
 )
-from actas import actas_bp
- 
+from actas import (actas_bp)
+import secciones
+
 load_dotenv()
  
 app = Flask(__name__)
@@ -35,6 +36,7 @@ app.config.update(
     # SESSION_COOKIE_SECURE=True,  # actívalo cuando uses HTTPS en producción
 )
 app.register_blueprint(actas_bp)
+secciones.registrar(app)
  
  
 def login_requerido(vista):

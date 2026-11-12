@@ -34,7 +34,7 @@
         <a href="{{ url_for('mis_actas') }}" class="{{ 'activo' if menu_activo == 'mis_actas' }}">{{ icono('folder') }} Mis actas</a>
         <a href="{{ url_for('asistentes') }}" class="{{ 'activo' if menu_activo == 'asistentes' }}">{{ icono('users') }} Asistentes</a>
         <a href="{{ url_for('compromisos') }}" class="{{ 'activo' if menu_activo == 'compromisos' }}">{{ icono('clipboard') }} Compromisos</a>
-        <a href="{{ url_for('usuarios') }}" class="{{ 'activo' if menu_activo == 'usuarios' }}">{{ icono('user-circle') }} Usuarios</a>
+        {% if es_admin %}<a href="{{ url_for('usuarios') }}" class="{{ 'activo' if menu_activo == 'usuarios' }}">{{ icono('user-circle') }} Usuarios</a>{% endif %}
         <a href="{{ url_for('reportes') }}" class="{{ 'activo' if menu_activo == 'reportes' }}">{{ icono('chart') }} Reportes</a>
         <a href="{{ url_for('configuracion') }}" class="{{ 'activo' if menu_activo == 'configuracion' }}">{{ icono('sliders') }} Configuración</a>
       </nav>
