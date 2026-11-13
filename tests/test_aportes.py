@@ -130,6 +130,19 @@ class FormularioGrandeTest(unittest.TestCase):
             with self.assertRaises(RequestEntityTooLarge):
                 request.form
 
+    def test_si_se_pasa_del_tope_avisa_y_vuelve_al_acta(self):
+        cliente = self.app.test_client()
+        with cliente.session_transaction() as sesion:
+            sesion["usuario_id"] = 1
+        relleno = "x" * (aportes.MAX_BYTES_FORMULARIO + 1)
+        respuesta = cliente.post("/actas/7/aporte", data={"desarrollo": relleno})
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(respuesta.headers["Location"].endswith("/actas/7#mi-aporte"))
+        with cliente.session_transaction() as sesion:
+            categoria, mensaje = sesion["_flashes"][0]
+        self.assertEqual(categoria, "error")
+        self.assertIn("50.000", mensaje)
+
 
 if __name__ == "__main__":
     unittest.main()
