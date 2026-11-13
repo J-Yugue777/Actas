@@ -476,11 +476,18 @@ def guardar_aporte(acta_id):
     abierta = guardado = False
     try:
         with transaccion() as cur:
-            if not _acceso(cur, acta_id, usuario_id)["participa"]:
-                abort(403)  # Administrador y Coordinador que no participan solo leen
+            _acceso(cur, acta_id, usuario_id)  # 404 si no existe, 403 si no tiene acceso
             # Bloquea el acta hasta terminar: nadie la cierra a mitad del guardado
             cur.execute("SELECT estado FROM actas WHERE id = %s FOR SHARE", (acta_id,))
             abierta = cur.fetchone()["estado"] == "abierta"
+            # Solo escribe quien tiene fila de participante (el líder también la necesita);
+            # Administrador y Coordinador que no participan solo leen. 403 sea cual sea el texto.
+            cur.execute(
+                "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s FOR UPDATE",
+                (acta_id, usuario_id),
+            )
+            if cur.fetchone() is None:
+                abort(403)
             if abierta and not errores:
                 cur.execute(
                     """
@@ -490,8 +497,6 @@ def guardar_aporte(acta_id):
                     """,
                     (aporte["desarrollo"], aporte["conclusiones"], acta_id, usuario_id),
                 )
-                if cur.rowcount == 0:
-                    abort(403)  # p. ej. el líder no quedó en la lista de participantes
                 guardado = True
     except psycopg2.Error:
         current_app.logger.exception("Error de base de datos al guardar el aporte")
