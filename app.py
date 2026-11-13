@@ -23,6 +23,7 @@ from db import (
     TIPOS_ITEM, MAX_LARGO_ITEM,
 )
 from actas import (actas_bp)
+import aportes
 import secciones
 
 load_dotenv()
@@ -33,6 +34,9 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # tope de toda la petición (US-012: adjuntos)
+    # US-020: Flask corta en 500 KB los formularios normales; el aporte (2 campos de
+    # 50.000 caracteres) puede pesar hasta 1,2 MB al enviarse. Cálculo en aportes.py.
+    MAX_FORM_MEMORY_SIZE=aportes.MAX_BYTES_FORMULARIO,
     # SESSION_COOKIE_SECURE=True,  # actívalo cuando uses HTTPS en producción
 )
 app.register_blueprint(actas_bp)
