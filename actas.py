@@ -130,6 +130,19 @@ def cargar_catalogos(cur):
 
 
 # ------------------------------------------- US-005 · regional y centro
+def agrupar_centros(regionales, centros):
+    """Centros agrupados bajo su regional, en el orden de `regionales`.
+
+    Las regionales sin centros también salen (con la lista vacía).
+    """
+    por_regional = {r["id"]: [] for r in regionales}
+    for c in centros:
+        if c["regional_id"] in por_regional:
+            por_regional[c["regional_id"]].append(c)
+    return [{"id": r["id"], "nombre": r["nombre"], "centros": por_regional[r["id"]]}
+            for r in regionales]
+
+
 def errores_lugar(regional_id, centro_id, regionales, centros):
     """Revisa la regional y el centro (ya convertidos a entero) contra el catálogo."""
     if regional_id is None:
@@ -397,7 +410,8 @@ def crear():
 
     return render_template(
         "crear_acta.html",
-        datos=datos, errores=errores, regionales=regionales, centros=centros,
+        datos=datos, errores=errores, regionales=regionales,
+        grupos_centros=agrupar_centros(regionales, centros),
         fichas=permisos["fichas"], puede_equipo=bool(permisos["fichas"]), meses=MESES,
     )
 

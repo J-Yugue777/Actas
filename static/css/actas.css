@@ -48,6 +48,12 @@
 
 .ayuda { display: block; margin-top: 0.3rem; font-size: 0.75rem; color: var(--texto-suave); }
 
+/* Regional y centro (US-005) */
+.campo select:disabled { cursor: not-allowed; }
+.campo select optgroup { font-weight: 700; color: var(--azul-titulo); }
+.campo select option { font-weight: 400; color: var(--texto); }
+.ayuda-aviso { color: var(--amarillo); font-weight: 600; }
+
 /* Tipo de acta */
 .opciones-tipo { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
 

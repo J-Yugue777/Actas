@@ -1,5 +1,6 @@
 """US-005 · Regional y centros de formación al crear el acta (sin base de datos)."""
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -20,6 +21,25 @@ CENTROS = [
     {"id": 4, "regional_id": 2, "nombre": "Centro de Servicios y Gestión Empresarial"},
     {"id": 3, "regional_id": 1, "nombre": "Centro de Gestión Tecnológica de Servicios"},
 ]
+
+
+class AgruparCentros(unittest.TestCase):
+    def test_respeta_el_orden_de_las_regionales_y_de_los_centros(self):
+        grupos = actas.agrupar_centros(REGIONALES, CENTROS)
+        self.assertEqual([g["nombre"] for g in grupos], ["Amazonas", "Antioquia", "Valle"])
+        self.assertEqual([c["id"] for c in grupos[2]["centros"]], [2, 1, 3])
+        self.assertEqual([c["id"] for c in grupos[1]["centros"]], [4])
+
+    def test_incluye_regionales_sin_centros(self):
+        grupos = actas.agrupar_centros(REGIONALES, CENTROS)
+        self.assertEqual(grupos[0], {"id": 4, "nombre": "Amazonas", "centros": []})
+
+    def test_ignora_centros_de_regionales_que_no_estan(self):
+        grupos = actas.agrupar_centros(REGIONALES, CENTROS + [{"id": 9, "regional_id": 99, "nombre": "X"}])
+        self.assertEqual(sum(len(g["centros"]) for g in grupos), len(CENTROS))
+
+    def test_catalogo_vacio(self):
+        self.assertEqual(actas.agrupar_centros([], []), [])
 
 
 class ErroresLugar(unittest.TestCase):
@@ -111,6 +131,75 @@ class ValidarLugar(unittest.TestCase):
     def test_centro_de_otra_regional(self):
         errores, _ = self.validar(regional_id="2", centro_id="1")
         self.assertIn("El centro de formación no pertenece a la regional elegida.", errores)
+
+
+class PlantillaCrearActa(unittest.TestCase):
+    """La plantilla pinta los centros agrupados por regional (funciona sin JavaScript)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from app import app
+        cls.app = app
+
+    def pintar(self, regional_id="", centro_id="", regionales=REGIONALES, centros=CENTROS):
+        from flask import render_template, session
+        datos = actas.datos_iniciales({"fichas": []})
+        datos.update(regional_id=regional_id, centro_id=centro_id)
+        with self.app.test_request_context("/actas/crear"):
+            session["nombre"] = "Ana Admin"
+            session["rol"] = "Administrador"
+            return render_template(
+                "crear_acta.html", datos=datos, errores=[], regionales=regionales,
+                grupos_centros=actas.agrupar_centros(regionales, centros),
+                fichas=[], puede_equipo=False, meses=actas.MESES,
+            )
+
+    def select_centro(self, html):
+        return re.search(r'<select id="centro_id".*?</select>', html, re.S).group(0)
+
+    def ayuda(self, html):
+        return re.search(r'<small class="([^"]*)" id="ayuda-centro" aria-live="polite">(.*?)</small>',
+                         html, re.S).groups()
+
+    def test_centros_en_optgroup_por_regional(self):
+        select = self.select_centro(self.pintar())
+        self.assertIn('<optgroup label="Valle" data-regional="1">', select)
+        self.assertIn('<optgroup label="Antioquia" data-regional="2">', select)
+        self.assertEqual(select.count("<optgroup"), 2)  # Amazonas no tiene centros
+        self.assertEqual(select.count('<option value="'), len(CENTROS) + 1)
+
+    def test_select_de_centro_habilitado_sin_javascript(self):
+        apertura = re.search(r'<select id="centro_id"[^>]*>', self.pintar()).group(0)
+        self.assertNotIn("disabled", apertura)
+        self.assertIn('aria-describedby="ayuda-centro"', apertura)
+        self.assertIn("required", apertura)
+
+    def test_label_asociado(self):
+        html = self.pintar()
+        self.assertIn('<label for="centro_id">', html)
+        self.assertIn('<label for="regional_id">', html)
+
+    def test_conserva_regional_y_centro(self):
+        html = self.pintar("1", "3")
+        self.assertRegex(html, r'<option value="1" selected>Valle</option>')
+        self.assertRegex(html, r'<option value="3" selected>Centro de Gestión Tecnológica de Servicios</option>')
+
+    def test_ayuda_con_cantidad_de_centros(self):
+        self.assertEqual(self.ayuda(self.pintar("1"))[1].strip(), "3 centros en Valle")
+        self.assertEqual(self.ayuda(self.pintar("2"))[1].strip(), "1 centro en Antioquia")
+
+    def test_ayuda_regional_sin_centros(self):
+        clases, texto = self.ayuda(self.pintar("4"))
+        self.assertIn("ayuda-aviso", clases)
+        self.assertIn("Amazonas no tiene centros de formación registrados", texto)
+
+    def test_escapa_los_nombres_del_catalogo(self):
+        regionales = [{"id": 1, "nombre": '<script>alert(1)</script>"'}]
+        centros = [{"id": 1, "regional_id": 1, "nombre": "<b>Centro</b>"}]
+        html = self.pintar("1", regionales=regionales, centros=centros)
+        self.assertNotIn("<script>alert(1)", html)
+        self.assertNotIn("<b>Centro</b>", html)
+        self.assertIn("&lt;b&gt;Centro&lt;/b&gt;", html)
 
 
 if __name__ == "__main__":
