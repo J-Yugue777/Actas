@@ -7,12 +7,19 @@
 -- cambia nada; solo agrega lo que falta:
 --   * una regional, si no hay otra con el mismo nombre (sin distinguir
 --     mayúsculas e ignorando el prefijo "Regional ": "Antioquia" cuenta
---     como "Regional Antioquia");
+--     como "Regional Antioquia"). Las nuevas siguen la forma de las que ya
+--     hay: si la mayoría va sin el prefijo ("Antioquia"), se agregan sin él
+--     ("Arauca"); si la tabla está vacía o la mayoría lo usa, con él
+--     ("Regional Arauca");
 --   * un centro, si su regional no tiene ya uno con el mismo nombre (sin
 --     distinguir mayúsculas). Hay nombres repetidos entre regionales
 --     ("Centro de Comercio y Servicios"), por eso se compara regional + centro.
 -- Las tildes sí cuentan, y si la base usa otro nombre para una regional
--- (p. ej. "Valle" en vez de "Valle del Cauca") quedarán las dos: revisa antes.
+-- (p. ej. "Valle" en vez de "Valle del Cauca") quedarán las dos y los centros
+-- que ya tenga se repetirán en la nueva. Revisa antes con
+--   SELECT nombre FROM regionales ORDER BY nombre;
+-- y renombra la que no coincida con el nombre oficial, p. ej.
+--   UPDATE regionales SET nombre = 'Valle del Cauca' WHERE nombre = 'Valle';
 -- Si la base tiene un UNIQUE solo sobre el nombre del centro, fallará por los
 -- nombres repetidos y no se guardará nada (todo va en una transacción).
 --
@@ -26,7 +33,8 @@
 BEGIN;
 
 INSERT INTO regionales (nombre)
-SELECT v.nombre
+SELECT CASE WHEN p.con_prefijo THEN v.nombre
+            ELSE regexp_replace(v.nombre, '^Regional\s+', '') END
 FROM (VALUES
     ('Regional Amazonas'),
     ('Regional Antioquia'),
@@ -62,6 +70,11 @@ FROM (VALUES
     ('Regional Vaupés'),
     ('Regional Vichada')
 ) AS v (nombre)
+-- Con "Regional " solo si la tabla está vacía o la mayoría de nombres ya lo trae
+CROSS JOIN (
+    SELECT count(*) FILTER (WHERE btrim(nombre) ~* '^regional\s') * 2 >= count(*) AS con_prefijo
+    FROM regionales
+) p
 WHERE NOT EXISTS (
     SELECT 1 FROM regionales r
     WHERE lower(regexp_replace(btrim(r.nombre), '^regional\s+', '', 'i'))
