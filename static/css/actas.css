@@ -22,7 +22,7 @@
   font: inherit;
   font-size: 0.9rem;
   color: var(--texto);
-  background: #fff;
+  background-color: #fff; /* sin "background": borraría la flecha de los select (style.css) */
   border: 1px solid var(--borde);
   border-radius: 10px;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -32,7 +32,7 @@
 .campo select:hover,
 .lista-dinamica input:hover { border-color: #b9ccc1; }
 
-.campo select:disabled { background: #f0f4f2; color: var(--texto-suave); }
+.campo select:disabled { background-color: #f0f4f2; color: var(--texto-suave); }
 
 .campo input:focus-visible,
 .campo select:focus-visible,
