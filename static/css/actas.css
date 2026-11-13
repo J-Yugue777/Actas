@@ -32,7 +32,7 @@
 .campo select:hover,
 .lista-dinamica input:hover { border-color: #b9ccc1; }
 
-.campo select:disabled { background-color: #f0f4f2; color: var(--texto-suave); }
+.campo select:disabled { background-color: #f0f4f2; color: var(--texto-suave); cursor: not-allowed; }
 
 .campo input:focus-visible,
 .campo select:focus-visible,
@@ -49,7 +49,6 @@
 .ayuda { display: block; margin-top: 0.3rem; font-size: 0.75rem; color: var(--texto-suave); }
 
 /* Regional y centro (US-005) */
-.campo select:disabled { cursor: not-allowed; }
 .campo select optgroup { font-weight: 700; color: var(--azul-titulo); }
 .campo select option { font-weight: 400; color: var(--texto); }
 .ayuda-aviso { color: var(--amarillo); font-weight: 600; }
