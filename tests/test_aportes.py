@@ -211,6 +211,12 @@ class AvisosAporteTest(unittest.TestCase):
         self.assertEqual(html.count("Tu aporte quedó guardado."), 1)
         self.assertLess(html.index("Tu aporte quedó guardado."), html.index('class="encabezado-acta"'))
 
+    def test_cada_campo_trae_su_aviso_de_pegado_recortado(self):
+        html = self.pintar([])
+        for campo in ("desarrollo", "conclusiones"):
+            self.assertIn(f'data-recorte="recorte-{campo}"', html)
+            self.assertIn(f'<p class="alerta aviso-recorte" id="recorte-{campo}" role="alert" hidden></p>', html)
+
     def test_los_demas_avisos_siguen_arriba(self):
         html = self.pintar([("ok", "Acta creada."), ("error", "Error de adjuntos.")])
         for mensaje in ("Acta creada.", "Error de adjuntos."):

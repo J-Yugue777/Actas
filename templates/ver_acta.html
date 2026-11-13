@@ -113,13 +113,14 @@
       <label for="aporte-{{ campo }}">{{ etiqueta }}</label>
       <textarea id="aporte-{{ campo }}" name="{{ campo }}" rows="12" maxlength="{{ max_aporte }}"
                 aria-describedby="{{ 'errores-aporte ' if errores_aporte }}ayuda-{{ campo }} contador-{{ campo }}"
-                data-contador="contador-{{ campo }}"{% if sin_texto or largo > max_aporte %} aria-invalid="true"{% endif %}>
+                data-contador="contador-{{ campo }}" data-recorte="recorte-{{ campo }}"{% if sin_texto or largo > max_aporte %} aria-invalid="true"{% endif %}>
 {{ aporte[campo] or '' }}</textarea>
       <div class="campo-pie">
         <span class="ayuda" id="ayuda-{{ campo }}">{{ ayuda }} Máximo {{ max_aporte|miles }} caracteres (unas 15 páginas).</span>
         <span class="ayuda contador-aporte{{ ' excedido' if largo > max_aporte }}" id="contador-{{ campo }}"
               aria-live="polite">{{ largo|miles }} / {{ max_aporte|miles }} caracteres</span>
       </div>
+      <p class="alerta aviso-recorte" id="recorte-{{ campo }}" role="alert" hidden></p>
     </div>
     {% endfor %}
     <p class="ayuda">Llena uno de los dos campos o ambos. Puedes corregir tu aporte mientras el acta esté abierta.</p>
@@ -251,13 +252,39 @@
     function miles(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
     // Cuenta igual que el servidor: el salto de línea vale 1 y no cuentan los espacios de los extremos
     function contar(t) { return Array.from(t.replace(/\r\n?/g, '\n').trim()).length; }
+    function puntos(t) { return Array.from(t).length; }  // un emoji vale 1, como en el servidor
     Array.prototype.forEach.call(campos, function (campo) {
       var contador = document.getElementById(campo.dataset.contador);
+      var recorte = document.getElementById(campo.dataset.recorte);
       function actualizar() {
         var n = contar(campo.value);
-        contador.textContent = miles(n) + ' / ' + miles(maximo) + ' caracteres';
-        contador.classList.toggle('excedido', n > maximo);
+        var lleno = puntos(campo.value) >= maximo;  // ya no deja escribir más
+        // maxlength cuenta en UTF-16 (un emoji vale 2): se le suma lo que ocupan
+        // de más los emoji para que quepan justo `maximo` caracteres
+        campo.maxLength = maximo + campo.value.length - puntos(campo.value);
+        contador.textContent = miles(n) + ' / ' + miles(maximo) + ' caracteres' +
+          (lleno && n <= maximo ? ' · límite alcanzado' : '');
+        contador.classList.toggle('excedido', lleno);
+        if (!lleno) recorte.hidden = true;
       }
+      // Si lo pegado no cabe, el navegador lo recorta: se deja entrar justo lo que cabe y se avisa
+      campo.addEventListener('paste', function (e) {
+        var pegado = (e.clipboardData ? e.clipboardData.getData('text/plain') : '').replace(/\r\n?/g, '\n');
+        if (!pegado) return;  // sin texto plano: el navegador decide, el servidor valida
+        var resto = campo.value.slice(0, campo.selectionStart) + campo.value.slice(campo.selectionEnd);
+        var libres = Math.max(0, maximo - puntos(resto));
+        var cabe = Array.from(pegado).slice(0, libres).join('');
+        campo.maxLength = resto.length + cabe.length;
+        var total = puntos(pegado);
+        if (total > libres) {
+          recorte.textContent = libres
+            ? 'Pegaste ' + miles(total) + ' caracteres y solo cupieron ' + miles(libres) +
+              ': el resto no se agregó. Revisa el final de lo que pegaste.'
+            : 'No se pegó nada: el campo ya tiene el máximo de ' + miles(maximo) + ' caracteres.';
+          recorte.hidden = false;
+        }
+        setTimeout(actualizar, 0);  // devuelve el maxlength normal aunque no se haya pegado nada
+      });
       campo.addEventListener('input', actualizar);
       actualizar();
     });
