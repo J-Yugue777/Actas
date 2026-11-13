@@ -507,7 +507,8 @@ def guardar_aporte(acta_id):
         flash("El acta ya no está abierta: no se puede registrar ni cambiar el aporte.", "error")
         return redirect(url_for("actas.ver", acta_id=acta_id))
     if guardado:
-        flash("Tu aporte quedó guardado.", "ok")
+        # aporte_ok/aporte_error se pintan dentro de #mi-aporte, a la vista al llegar al ancla
+        flash("Tu aporte quedó guardado.", "aporte_ok")
         return redirect(url_for("actas.ver", acta_id=acta_id) + "#mi-aporte")
     # Error de validación: no se redirige, para no perder lo que la persona escribió
     return _mostrar_acta(acta_id, usuario_id, 400, aporte=aporte, errores_aporte=errores)
@@ -656,7 +657,7 @@ def archivo_demasiado_grande(error):
     if request.endpoint == "actas.guardar_aporte":
         flash("Tu aporte es demasiado grande para enviarlo. Recorta el texto: máximo "
               f"{aportes.miles(aportes.MAX_LARGO_APORTE)} caracteres en el desarrollo y otros tantos "
-              "en las conclusiones.", "error")
+              "en las conclusiones.", "aporte_error")
         return redirect(url_for("actas.ver", acta_id=request.view_args["acta_id"]) + "#mi-aporte")
     if request.endpoint == "actas.subir_adjuntos":
         flash("Los archivos juntos pesan demasiado. Sube menos archivos a la vez "

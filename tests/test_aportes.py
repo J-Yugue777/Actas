@@ -140,8 +140,82 @@ class FormularioGrandeTest(unittest.TestCase):
         self.assertTrue(respuesta.headers["Location"].endswith("/actas/7#mi-aporte"))
         with cliente.session_transaction() as sesion:
             categoria, mensaje = sesion["_flashes"][0]
-        self.assertEqual(categoria, "error")
+        self.assertEqual(categoria, "aporte_error")  # se pinta dentro de #mi-aporte
         self.assertIn("50.000", mensaje)
+
+
+class AvisosAporteTest(unittest.TestCase):
+    """Tras guardar se salta a #mi-aporte: el aviso debe quedar dentro de ese panel, a la vista."""
+
+    @classmethod
+    def setUpClass(cls):
+        os.environ.setdefault("SECRET_KEY", "clave-de-pruebas")
+        from app import app
+        cls.app = app
+
+    def pintar(self, avisos, **cambios):
+        """HTML de ver_acta.html con datos de ejemplo, sin base de datos."""
+        import psycopg2
+        from datetime import date, time
+        from unittest import mock
+        from flask import flash, render_template, session
+        import actas
+        import adjuntos as adj
+
+        acta = {
+            "id": 7, "numero_acta": "ACTA-2026-0007", "nombre_reunion": "Comité", "lider_id": 1,
+            "estado": "abierta", "tipo_acta": "otros_asuntos", "ficha": None, "programa": None,
+            "mes": None, "ciudad": "Palmira", "fecha_reunion": date(2026, 11, 13),
+            "hora_inicio": time(8), "hora_fin": time(10), "lugar_enlace": "Sala 1",
+            "regional": "Valle", "centro": "Centro Agropecuario", "codigo_formato": None,
+            "creador": "Ana Pérez",
+        }
+        participante = {
+            "usuario_id": 1, "nombre": "Ana", "apellido": "Pérez", "rol": actas.ROL_LIDER,
+            "es_creador": True, "aporto": False, "desarrollo": None, "conclusiones": None,
+            "aporte_actualizado_en": None,
+        }
+        contexto = dict(
+            acta=acta, meses=actas.MESES, participantes=[participante], adjuntos=[],
+            puede_adjuntar=False, puede_gestionar_adjuntos=True,
+            max_mb=adj.MAX_BYTES // (1024 * 1024), max_bytes=adj.MAX_BYTES,
+            max_por_persona=adj.MAX_POR_PERSONA, tipos_texto=adj.EXTENSIONES_TEXTO,
+            accept=adj.ACCEPT_HTML, agenda=["Punto 1"], objetivos=["Objetivo 1"],
+            puede_aportar=True, aporte={"desarrollo": None, "conclusiones": None},
+            aporte_guardado_en=None, errores_aporte=[], max_aporte=MAX_LARGO_APORTE,
+        )
+        contexto.update(cambios)
+        sin_bd = mock.patch("actas.get_connection", side_effect=psycopg2.OperationalError("sin BD"))
+        with sin_bd, self.app.test_request_context("/actas/7"):
+            session.update(usuario_id=1, nombre="Ana Pérez", rol=actas.ROL_LIDER)
+            for categoria, mensaje in avisos:
+                flash(mensaje, categoria)
+            return render_template("ver_acta.html", **contexto)
+
+    def test_guardado_se_ve_dentro_de_mi_aporte(self):
+        html = self.pintar([("aporte_ok", "Tu aporte quedó guardado.")])
+        self.assertEqual(html.count("Tu aporte quedó guardado."), 1)
+        self.assertLess(html.index('id="mi-aporte"'), html.index("Tu aporte quedó guardado."))
+        self.assertLess(html.index("Tu aporte quedó guardado."), html.index('id="form-aporte"'))
+
+    def test_error_413_se_ve_dentro_de_mi_aporte(self):
+        html = self.pintar([("aporte_error", "Tu aporte es demasiado grande para enviarlo.")])
+        posicion = html.index("Tu aporte es demasiado grande para enviarlo.")
+        self.assertLess(html.index('id="mi-aporte"'), posicion)
+        self.assertLess(posicion, html.index('id="form-aporte"'))
+
+    def test_sin_panel_mi_aporte_el_aviso_sale_arriba(self):
+        # p. ej. el acta se cerró entre el guardado y la recarga: el aviso no se pierde
+        html = self.pintar([("aporte_ok", "Tu aporte quedó guardado.")], puede_aportar=False)
+        self.assertNotIn('id="mi-aporte"', html)
+        self.assertEqual(html.count("Tu aporte quedó guardado."), 1)
+        self.assertLess(html.index("Tu aporte quedó guardado."), html.index('class="encabezado-acta"'))
+
+    def test_los_demas_avisos_siguen_arriba(self):
+        html = self.pintar([("ok", "Acta creada."), ("error", "Error de adjuntos.")])
+        for mensaje in ("Acta creada.", "Error de adjuntos."):
+            self.assertEqual(html.count(mensaje), 1)
+            self.assertLess(html.index(mensaje), html.index('class="encabezado-acta"'))
 
 
 if __name__ == "__main__":

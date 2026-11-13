@@ -4,10 +4,11 @@
 {% block titulo %}{{ acta.numero_acta }} | Actas SENA{% endblock %}
 
 {% block contenido %}
-{% for mensaje in get_flashed_messages(category_filter=['ok']) %}
+{# Los avisos del aporte van dentro de "Mi aporte"; aquí solo si ese panel no se muestra #}
+{% for mensaje in get_flashed_messages(category_filter=['ok'] if puede_aportar else ['ok', 'aporte_ok']) %}
   <div class="aviso-ok" role="status">{{ mensaje }}</div>
 {% endfor %}
-{% for mensaje in get_flashed_messages(category_filter=['error']) %}
+{% for mensaje in get_flashed_messages(category_filter=['error'] if puede_aportar else ['error', 'aporte_error']) %}
   <div class="alerta" role="alert">{{ mensaje }}</div>
 {% endfor %}
 
@@ -89,6 +90,12 @@
     <h2><span class="icono-titulo">{{ icono('user') }}</span> Mi aporte</h2>
     {% if aporte_guardado_en %}<small>Guardado por última vez el {{ aporte_guardado_en.strftime('%d/%m/%Y a las %H:%M') }}</small>{% endif %}
   </header>
+  {% for mensaje in get_flashed_messages(category_filter=['aporte_ok']) %}
+  <div class="aviso-ok" role="status">{{ mensaje }}</div>
+  {% endfor %}
+  {% for mensaje in get_flashed_messages(category_filter=['aporte_error']) %}
+  <div class="alerta" role="alert">{{ mensaje }}</div>
+  {% endfor %}
   {% if errores_aporte %}
   <div class="alerta alerta-lista" role="alert" id="errores-aporte" tabindex="-1">
     <strong>No se guardó tu aporte. Tu texto sigue en el formulario.</strong>
