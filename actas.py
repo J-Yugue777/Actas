@@ -416,7 +416,8 @@ def ver(acta_id):
             cur.execute(
                 """
                 SELECT u.nombre, u.apellido, r.nombre AS rol, (u.id = %s) AS es_creador,
-                       (p.desarrollo IS NOT NULL OR p.conclusiones IS NOT NULL) AS aporto
+                       (p.desarrollo IS NOT NULL OR p.conclusiones IS NOT NULL) AS aporto,
+                       u.id AS uid, (u.firma_archivo IS NOT NULL) AS tiene_firma
                 FROM acta_participantes p
                 JOIN usuarios u ON u.id = p.usuario_id
                 JOIN roles r ON r.id = u.rol_id
@@ -426,6 +427,27 @@ def ver(acta_id):
                 (acta["lider_id"], acta_id, acta["lider_id"]),
             )
             participantes = cur.fetchall()
+            cur.execute(
+                "SELECT desarrollo, conclusiones FROM acta_participantes "
+                "WHERE acta_id = %s AND usuario_id = %s", (acta_id, usuario_id))
+            mi_aporte = cur.fetchone()
+            cur.execute(
+                """
+                SELECT c.id, c.actividad, c.fecha_entrega, c.completado, c.creado_por,
+                       c.responsable_id,
+                       COALESCE(ur.nombre || ' ' || ur.apellido, c.responsable_texto) AS responsable,
+                       (uc.firma_archivo IS NOT NULL) AS tiene_firma
+                FROM acta_compromisos c
+                LEFT JOIN usuarios ur ON ur.id = c.responsable_id
+                LEFT JOIN usuarios uc ON uc.id = c.creado_por
+                WHERE c.acta_id = %s
+                ORDER BY c.fecha_entrega, c.id
+                """,
+                (acta_id,),
+            )
+            compromisos = cur.fetchall()
+            cur.execute("SELECT (firma_archivo IS NOT NULL) AS tiene FROM usuarios WHERE id = %s", (usuario_id,))
+            tengo_firma = cur.fetchone()["tiene"]
             lista_adjuntos = adj.listar_adjuntos(cur, acta_id)
             puede_adjuntar = acta["estado"] == "abierta" and (
                 es_participante or acta["lider_id"] == usuario_id)
@@ -435,6 +457,8 @@ def ver(acta_id):
 
     return render_template(
         "ver_acta.html", acta=acta, meses=MESES, participantes=participantes,
+        mi_aporte=mi_aporte, compromisos=compromisos, tengo_firma=tengo_firma,
+        es_participante=es_participante, es_lider=acta["lider_id"] == usuario_id,
         adjuntos=lista_adjuntos, puede_adjuntar=puede_adjuntar,
         puede_gestionar_adjuntos=acta["estado"] == "abierta",
         max_mb=adj.MAX_BYTES // (1024 * 1024), max_bytes=adj.MAX_BYTES,

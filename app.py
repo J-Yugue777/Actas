@@ -23,6 +23,8 @@ from db import (
     TIPOS_ITEM, MAX_LARGO_ITEM,
 )
 from actas import (actas_bp)
+from aportes import aportes_bp
+from pdf_acta import pdf_bp
 import secciones
 
 load_dotenv()
@@ -36,6 +38,8 @@ app.config.update(
     # SESSION_COOKIE_SECURE=True,  # actívalo cuando uses HTTPS en producción
 )
 app.register_blueprint(actas_bp)
+app.register_blueprint(aportes_bp)
+app.register_blueprint(pdf_bp)
 secciones.registrar(app)
  
  
