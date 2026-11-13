@@ -76,7 +76,79 @@
       </tbody>
     </table>
   </div>
-  <p class="nota-numero">El acta está abierta: cada participante, incluido quien la creó, registrará aquí su aporte (desarrollo, conclusiones, compromisos, firma y anexos).</p>
+  {% if acta.estado == 'abierta' %}
+  <p class="nota-numero">El acta está abierta: cada participante, incluido quien la creó, registra su desarrollo y sus conclusiones{% if puede_aportar %} en <a href="#mi-aporte">Mi aporte</a>{% endif %}. Los aportes se leen completos en «Aportes de los participantes».</p>
+  {% else %}
+  <p class="nota-numero">El acta está cerrada: los aportes quedan en solo lectura.</p>
+  {% endif %}
+</section>
+
+{% if puede_aportar %}
+<section class="panel" id="mi-aporte">
+  <header class="panel-cab envuelve">
+    <h2><span class="icono-titulo">{{ icono('user') }}</span> Mi aporte</h2>
+    {% if aporte_guardado_en %}<small>Guardado por última vez el {{ aporte_guardado_en.strftime('%d/%m/%Y a las %H:%M') }}</small>{% endif %}
+  </header>
+  {% if errores_aporte %}
+  <div class="alerta alerta-lista" role="alert" id="errores-aporte" tabindex="-1">
+    <strong>No se guardó tu aporte. Tu texto sigue en el formulario.</strong>
+    <ul>{% for e in errores_aporte %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% set sin_texto = errores_aporte and not aporte.desarrollo and not aporte.conclusiones %}
+  <form class="form-aporte" method="post" id="form-aporte"
+        action="{{ url_for('actas.guardar_aporte', acta_id=acta.id) }}#mi-aporte">
+    {% for campo, etiqueta, ayuda in [
+         ('desarrollo', 'Desarrollo de la reunión', 'Relata lo que se trató en la reunión, punto por punto.'),
+         ('conclusiones', 'Conclusiones', 'Acuerdos y conclusiones a las que se llegó.')] %}
+    {% set largo = (aporte[campo] or '')|length %}
+    <div class="campo">
+      <label for="aporte-{{ campo }}">{{ etiqueta }}</label>
+      <textarea id="aporte-{{ campo }}" name="{{ campo }}" rows="12" maxlength="{{ max_aporte }}"
+                aria-describedby="{{ 'errores-aporte ' if errores_aporte }}ayuda-{{ campo }} contador-{{ campo }}"
+                data-contador="contador-{{ campo }}"{% if sin_texto or largo > max_aporte %} aria-invalid="true"{% endif %}>
+{{ aporte[campo] or '' }}</textarea>
+      <div class="campo-pie">
+        <span class="ayuda" id="ayuda-{{ campo }}">{{ ayuda }} Máximo {{ max_aporte|miles }} caracteres (unas 15 páginas).</span>
+        <span class="ayuda contador-aporte{{ ' excedido' if largo > max_aporte }}" id="contador-{{ campo }}"
+              aria-live="polite">{{ largo|miles }} / {{ max_aporte|miles }} caracteres</span>
+      </div>
+    </div>
+    {% endfor %}
+    <p class="ayuda">Llena uno de los dos campos o ambos. Puedes corregir tu aporte mientras el acta esté abierta.</p>
+    <button type="submit" class="btn-primario">Guardar mi aporte</button>
+  </form>
+</section>
+{% endif %}
+
+{% set con_aporte = participantes|selectattr('aporto')|list %}
+<section class="panel" id="aportes">
+  <header class="panel-cab envuelve">
+    <h2><span class="icono-titulo">{{ icono('file-text') }}</span> Aportes de los participantes</h2>
+    <small>{{ con_aporte|length }} de {{ participantes|length }} con aporte</small>
+  </header>
+  {% for p in con_aporte %}
+  <article class="aporte">
+    <header class="aporte-cab">
+      <h3>{{ p.nombre }} {{ p.apellido }}{% if p.es_creador %} <small>(creador)</small>{% endif %}</h3>
+      <span>{{ p.rol }}{% if p.aporte_actualizado_en %} · {{ p.aporte_actualizado_en.strftime('%d/%m/%Y %H:%M') }}{% endif %}</span>
+    </header>
+    {% if p.desarrollo %}
+    <h4>Desarrollo de la reunión</h4>
+    <div class="aporte-texto">{{ p.desarrollo }}</div>
+    {% endif %}
+    {% if p.conclusiones %}
+    <h4>Conclusiones</h4>
+    <div class="aporte-texto">{{ p.conclusiones }}</div>
+    {% endif %}
+  </article>
+  {% else %}
+  <div class="vacio-ilustrado vacio-aportes">
+    <span class="vacio-icono">{{ icono('file-text') }}</span>
+    <p class="fuerte">Todavía nadie ha registrado su aporte.</p>
+    <p class="sub">{{ 'Aquí aparecerán completos el desarrollo y las conclusiones de cada participante.' if acta.estado == 'abierta' else 'El acta se cerró sin aportes registrados.' }}</p>
+  </div>
+  {% endfor %}
 </section>
 
 <section class="panel" id="adjuntos">
@@ -159,6 +231,40 @@
     });
   })();
 </script>
+{% if puede_aportar %}
+<script>
+  // Mi aporte (US-020): contador de caracteres y aviso al salir sin guardar.
+  // El servidor vuelve a validar todo.
+  (function () {
+    var form = document.getElementById('form-aporte');
+    var campos = form.querySelectorAll('textarea');
+    var maximo = {{ max_aporte }};
+    var sinGuardar = {{ 'true' if errores_aporte else 'false' }};  // volvió con errores: nada se guardó
+    var enviando = false;
+    function miles(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+    // Cuenta igual que el servidor: el salto de línea vale 1 y no cuentan los espacios de los extremos
+    function contar(t) { return Array.from(t.replace(/\r\n?/g, '\n').trim()).length; }
+    Array.prototype.forEach.call(campos, function (campo) {
+      var contador = document.getElementById(campo.dataset.contador);
+      function actualizar() {
+        var n = contar(campo.value);
+        contador.textContent = miles(n) + ' / ' + miles(maximo) + ' caracteres';
+        contador.classList.toggle('excedido', n > maximo);
+      }
+      campo.addEventListener('input', actualizar);
+      actualizar();
+    });
+    form.addEventListener('submit', function () { enviando = true; });
+    window.addEventListener('beforeunload', function (e) {
+      if (enviando) return;
+      var cambios = sinGuardar || Array.prototype.some.call(campos, function (c) { return c.value !== c.defaultValue; });
+      if (cambios) { e.preventDefault(); e.returnValue = ''; }
+    });
+    var errores = document.getElementById('errores-aporte');
+    if (errores) errores.focus();
+  })();
+</script>
+{% endif %}
 {% if puede_adjuntar %}
 <script>
   // Aviso inmediato; el servidor vuelve a validar todo.

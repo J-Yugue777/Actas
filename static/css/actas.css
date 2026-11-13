@@ -252,3 +252,31 @@
 .modal-acciones { display: flex; justify-content: center; gap: 0.75rem; margin-top: 1.6rem; }
 .modal-acciones .btn-primario { width: auto; margin: 0; padding: 0.7rem 1.4rem; }
 .modal-acciones .btn-sec { padding: 0.7rem 1.4rem; }
+
+/* ---- Aporte de cada participante (US-020) ---- */
+.nota-numero a { font-weight: 700; color: var(--verde-texto); }
+.form-aporte { display: grid; gap: 1.1rem; }
+.form-aporte textarea { min-height: 14rem; line-height: 1.55; resize: vertical; }
+.campo textarea:hover { border-color: #b9ccc1; }
+.campo textarea:focus-visible { outline: none; border-color: var(--verde-sena); box-shadow: var(--anillo); }
+.campo textarea[aria-invalid="true"] { border-color: var(--rojo); }
+.campo-pie { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 1rem; }
+.campo-pie .ayuda { flex: 1 1 16rem; }
+.campo-pie .contador-aporte { flex: 0 0 auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.contador-aporte.excedido { color: var(--rojo); font-weight: 700; }
+.form-aporte .btn-primario { justify-self: start; width: auto; margin: 0; padding: 0.8rem 1.8rem; }
+.panel-cab.envuelve { flex-wrap: wrap; row-gap: 0.25rem; }
+#mi-aporte .alerta-lista { margin-top: 0; }
+#errores-aporte:focus { outline: none; }
+
+.aporte { min-width: 0; padding: 1rem 1.15rem; border: 1px solid var(--borde); border-radius: 12px; }
+.aporte + .aporte { margin-top: 0.9rem; }
+.aporte-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.7rem; padding-bottom: 0.6rem; border-bottom: 1px solid #eef3f0; }
+.aporte-cab h3 { font-size: 0.95rem; color: var(--azul-titulo); }
+.aporte-cab h3 small { font-weight: 500; color: var(--texto-suave); }
+.aporte-cab span { font-size: 0.78rem; color: var(--texto-suave); }
+.aporte h4 { margin: 0.9rem 0 0.3rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--texto-suave); }
+/* Texto completo, con sus saltos de línea, sin desbordar aunque traiga palabras larguísimas */
+.aporte-texto { font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vacio-ilustrado.vacio-aportes { gap: 0.3rem; padding: 1.5rem 1rem; }
+.vacio-aportes .sub { margin: 0; font-size: 0.85rem; }
