@@ -65,13 +65,14 @@
   <header class="panel-cab"><h2><span class="icono-titulo">{{ icono('users') }}</span> Participantes</h2></header>
   <div class="tabla-scroll">
     <table>
-      <thead><tr><th>Nombre</th><th>Rol</th><th>Aporte</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Rol</th><th>Aporte</th><th>Firma</th></tr></thead>
       <tbody>
         {% for p in participantes %}
         <tr>
           <td class="fuerte">{{ p.nombre }} {{ p.apellido }}{% if p.es_creador %} <small>(creador)</small>{% endif %}</td>
           <td>{{ p.rol }}</td>
           <td><span class="insignia {{ 'verde' if p.aporto else 'amarillo' }}">{{ 'Registrado' if p.aporto else 'Pendiente' }}</span></td>
+          <td>{% if p.firmado_en %}<span class="insignia verde">Firmado {{ p.firmado_en.strftime('%d/%m/%Y %H:%M') }}</span>{% else %}<span class="insignia amarillo">Pendiente</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -127,6 +128,30 @@
     <p class="ayuda">Llena uno de los dos campos o ambos. Puedes corregir tu aporte mientras el acta esté abierta.</p>
     <button type="submit" class="btn-primario">Guardar mi aporte</button>
   </form>
+
+  {# US-013: la firma es del aporte guardado; si después cambia, hay que volver a firmar #}
+  <div class="firma-aporte{{ ' firmada' if mi_firma }}" id="firma">
+    <span class="estado-icono">{{ icono('check-circle' if mi_firma else 'clock') }}</span>
+    <div class="firma-texto">
+      {% if mi_firma %}
+      <strong>Firmaste tu aporte el {{ mi_firma.strftime('%d/%m/%Y') }} a las {{ mi_firma.strftime('%H:%M') }}.</strong>
+      <small>Con tu firma apruebas el acta. Si cambias tu aporte, la firma se anula y tendrás que volver a firmarlo.</small>
+      {% elif mi_aporto %}
+      <strong>Falta tu firma.</strong>
+      <small>Cuando tu aporte esté completo, fírmalo: firmar es aprobar el acta. El líder solo puede cerrarla cuando todos firmaron.</small>
+      {% else %}
+      <strong>Falta tu aporte y tu firma.</strong>
+      <small id="firma-ayuda">Guarda tu aporte para poder firmarlo.</small>
+      {% endif %}
+    </div>
+    {% if not mi_firma %}
+    <form method="post" action="{{ url_for('actas.firmar', acta_id=acta.id) }}"
+          data-confirmar="¿Firmar tu aporte?"
+          data-detalle="Firmar es aprobar el acta con el aporte que tienes guardado. Si después lo cambias, la firma se anula y tendrás que firmarlo de nuevo.">
+      <button type="submit" class="btn-sec"{% if not mi_aporto %} disabled aria-describedby="firma-ayuda"{% endif %}>Firmar mi aporte</button>
+    </form>
+    {% endif %}
+  </div>
 </section>
 {% endif %}
 

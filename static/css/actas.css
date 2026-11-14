@@ -283,3 +283,21 @@
 .aporte-texto { font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .vacio-ilustrado.vacio-aportes { gap: 0.3rem; padding: 1.5rem 1rem; }
 .vacio-aportes .sub { margin: 0; font-size: 0.85rem; }
+
+/* ---- Firma del aporte (US-013) ---- */
+.firma-aporte {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1rem;
+  margin-top: 1.25rem; padding: 0.9rem 1rem;
+  background: var(--amarillo-claro); border: 1px solid #f1dd8f; border-radius: 12px;
+}
+.firma-aporte.firmada { background: var(--verde-claro); border-color: #c4e6ad; }
+.firma-aporte .estado-icono { flex: none; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; color: var(--amarillo); background: #fff; border-radius: 50%; }
+.firma-aporte.firmada .estado-icono { color: var(--verde-texto); }
+.firma-aporte .estado-icono .icono { width: 1.2rem; height: 1.2rem; }
+.firma-texto { flex: 1 1 16rem; display: grid; gap: 0.15rem; }
+.firma-texto strong { font-size: 0.92rem; color: var(--azul-titulo); }
+.firma-texto small { font-size: 0.8rem; color: var(--texto-suave); }
+.firma-aporte form { margin: 0; }
+.firma-aporte .btn-sec { padding: 0.65rem 1.3rem; }
+.firma-aporte .btn-sec:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+.firma-aporte .btn-sec:disabled:hover { background: #fff; border-color: var(--borde); }

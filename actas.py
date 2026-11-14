@@ -372,6 +372,29 @@ def crear():
     )
 
 
+def listar_participantes(cur, acta_id, lider_id):
+    """Participantes del acta (primero el líder) con su aporte y su firma (US-013).
+
+    Las fechas vienen en hora de Colombia, sin zona, listas para strftime.
+    """
+    cur.execute(
+        """
+        SELECT p.usuario_id, u.nombre, u.apellido, r.nombre AS rol, (u.id = %s) AS es_creador,
+               (p.desarrollo IS NOT NULL OR p.conclusiones IS NOT NULL) AS aporto,
+               p.desarrollo, p.conclusiones,
+               p.aporte_actualizado_en AT TIME ZONE 'America/Bogota' AS aporte_actualizado_en,
+               p.firmado_en AT TIME ZONE 'America/Bogota' AS firmado_en
+        FROM acta_participantes p
+        JOIN usuarios u ON u.id = p.usuario_id
+        JOIN roles r ON r.id = u.rol_id
+        WHERE p.acta_id = %s
+        ORDER BY (u.id = %s) DESC, u.apellido, u.nombre, u.id
+        """,
+        (lider_id, acta_id, lider_id),
+    )
+    return cur.fetchall()
+
+
 def contexto_ver(cur, acta_id, usuario_id):
     """Datos de la plantilla ver_acta.html. 404 si el acta no existe, 403 si no tiene acceso."""
     cur.execute(
@@ -411,21 +434,7 @@ def contexto_ver(cur, acta_id, usuario_id):
         (acta_id,),
     )
     puntos = cur.fetchall()
-    cur.execute(
-        """
-        SELECT p.usuario_id, u.nombre, u.apellido, r.nombre AS rol, (u.id = %s) AS es_creador,
-               (p.desarrollo IS NOT NULL OR p.conclusiones IS NOT NULL) AS aporto,
-               p.desarrollo, p.conclusiones,
-               p.aporte_actualizado_en AT TIME ZONE 'America/Bogota' AS aporte_actualizado_en
-        FROM acta_participantes p
-        JOIN usuarios u ON u.id = p.usuario_id
-        JOIN roles r ON r.id = u.rol_id
-        WHERE p.acta_id = %s
-        ORDER BY (u.id = %s) DESC, u.apellido, u.nombre
-        """,
-        (acta["lider_id"], acta_id, acta["lider_id"]),
-    )
-    participantes = cur.fetchall()
+    participantes = listar_participantes(cur, acta_id, acta["lider_id"])
     lista_adjuntos = adj.listar_adjuntos(cur, acta_id)
     puede_adjuntar = acta["estado"] == "abierta" and (
         es_participante or acta["lider_id"] == usuario_id)
@@ -445,6 +454,8 @@ def contexto_ver(cur, acta_id, usuario_id):
         aporte={c: mio[c] if mio else None for c in aportes.CAMPOS},
         aporte_guardado_en=mio["aporte_actualizado_en"] if mio else None,
         errores_aporte=[], max_aporte=aportes.MAX_LARGO_APORTE,
+        # US-013: firma del aporte guardado (no del texto que se esté editando)
+        mi_aporto=bool(mio and mio["aporto"]), mi_firma=mio["firmado_en"] if mio else None,
     )
 
 
@@ -473,7 +484,7 @@ def guardar_aporte(acta_id):
     usuario_id = session["usuario_id"]
     aporte = aportes.leer_aporte(request.form)
     errores = aportes.validar_aporte(aporte)
-    abierta = guardado = False
+    abierta = guardado = firma_anulada = firma_conservada = False
     try:
         with transaccion() as cur:
             _acceso(cur, acta_id, usuario_id)  # 404 si no existe, 403 si no tiene acceso
@@ -483,20 +494,29 @@ def guardar_aporte(acta_id):
             # Solo escribe quien tiene fila de participante (el líder también la necesita);
             # Administrador y Coordinador que no participan solo leen. 403 sea cual sea el texto.
             cur.execute(
-                "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s FOR UPDATE",
+                "SELECT desarrollo, conclusiones, firmado_en FROM acta_participantes "
+                "WHERE acta_id = %s AND usuario_id = %s FOR UPDATE",
                 (acta_id, usuario_id),
             )
-            if cur.fetchone() is None:
+            fila = cur.fetchone()
+            if fila is None:
                 abort(403)
             if abierta and not errores:
-                cur.execute(
-                    """
-                    UPDATE acta_participantes
-                    SET desarrollo = %s, conclusiones = %s, aporte_actualizado_en = now()
-                    WHERE acta_id = %s AND usuario_id = %s
-                    """,
-                    (aporte["desarrollo"], aporte["conclusiones"], acta_id, usuario_id),
-                )
+                # US-013: la firma aprueba un texto; si el texto cambia, la firma se anula
+                cambio = (fila["desarrollo"], fila["conclusiones"]) != (
+                    aporte["desarrollo"], aporte["conclusiones"])
+                firma_anulada = cambio and fila["firmado_en"] is not None
+                firma_conservada = not cambio and fila["firmado_en"] is not None
+                if cambio:  # el mismo texto no se reescribe: conserva la hora y la firma
+                    cur.execute(
+                        """
+                        UPDATE acta_participantes
+                        SET desarrollo = %s, conclusiones = %s, aporte_actualizado_en = now(),
+                            firmado_en = NULL
+                        WHERE acta_id = %s AND usuario_id = %s
+                        """,
+                        (aporte["desarrollo"], aporte["conclusiones"], acta_id, usuario_id),
+                    )
                 guardado = True
     except psycopg2.Error:
         current_app.logger.exception("Error de base de datos al guardar el aporte")
@@ -508,10 +528,60 @@ def guardar_aporte(acta_id):
         return redirect(url_for("actas.ver", acta_id=acta_id))
     if guardado:
         # aporte_ok/aporte_error se pintan dentro de #mi-aporte, a la vista al llegar al ancla
-        flash("Tu aporte quedó guardado.", "aporte_ok")
+        if firma_conservada:
+            flash("Tu aporte no cambió: tu firma sigue vigente.", "aporte_ok")
+        else:
+            flash("Tu aporte quedó guardado.", "aporte_ok")
+        if firma_anulada:
+            flash("Tu aporte cambió: vuelve a firmarlo. La firma anterior quedó anulada.", "aporte_error")
         return redirect(url_for("actas.ver", acta_id=acta_id) + "#mi-aporte")
     # Error de validación: no se redirige, para no perder lo que la persona escribió
     return _mostrar_acta(acta_id, usuario_id, 400, aporte=aporte, errores_aporte=errores)
+
+
+# ---------------------------------------------------- US-013 · firma del aporte
+@actas_bp.route("/<int:acta_id>/firmar", methods=["POST"])
+@login_requerido
+def firmar(acta_id):
+    """El participante firma su aporte guardado: firmar es aprobar el acta."""
+    usuario_id = session["usuario_id"]
+    destino = redirect(url_for("actas.ver", acta_id=acta_id) + "#mi-aporte")
+    try:
+        with transaccion() as cur:
+            _acceso(cur, acta_id, usuario_id)  # 404 si no existe, 403 si no tiene acceso
+            # Como al guardar el aporte: nadie cierra el acta a mitad de la firma
+            cur.execute("SELECT estado FROM actas WHERE id = %s FOR SHARE", (acta_id,))
+            abierta = cur.fetchone()["estado"] == "abierta"
+            cur.execute(
+                "SELECT desarrollo, conclusiones, firmado_en FROM acta_participantes "
+                "WHERE acta_id = %s AND usuario_id = %s FOR UPDATE",
+                (acta_id, usuario_id),
+            )
+            fila = cur.fetchone()
+            if fila is None:
+                abort(403)  # solo firman los participantes
+            if not abierta:
+                flash("El acta ya está cerrada: no se puede firmar.", "error")
+                return redirect(url_for("actas.ver", acta_id=acta_id))
+            if fila["desarrollo"] is None and fila["conclusiones"] is None:
+                aviso = ("Guarda tu aporte antes de firmarlo.", "aporte_error")
+            elif fila["firmado_en"] is not None:
+                aviso = ("Tu aporte ya estaba firmado.", "aporte_ok")
+            else:
+                cur.execute(
+                    "UPDATE acta_participantes SET firmado_en = now() "
+                    "WHERE acta_id = %s AND usuario_id = %s",
+                    (acta_id, usuario_id),
+                )
+                aviso = ("Firmaste tu aporte: con eso apruebas el acta.", "aporte_ok")
+    except psycopg2.errors.ObjectNotInPrerequisiteState:
+        flash("El acta ya está cerrada: no se puede firmar.", "error")
+        return redirect(url_for("actas.ver", acta_id=acta_id))
+    except psycopg2.Error:
+        current_app.logger.exception("Error de base de datos al firmar el aporte")
+        aviso = ("No pudimos registrar tu firma. Intenta de nuevo.", "aporte_error")
+    flash(*aviso)  # después del COMMIT: no anuncia una firma que no quedó guardada
+    return destino
 
 
 # ------------------------------------------------------- US-012 · adjuntos
