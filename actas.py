@@ -549,6 +549,8 @@ def guardar_aporte(acta_id):
                         (aporte["desarrollo"], aporte["conclusiones"], acta_id, usuario_id),
                     )
                 guardado = True
+    except psycopg2.errors.ObjectNotInPrerequisiteState:
+        abierta = False  # el trigger de US-013 lo rechazó: el acta ya está cerrada
     except psycopg2.Error:
         current_app.logger.exception("Error de base de datos al guardar el aporte")
         errores = ["No pudimos guardar tu aporte. Tu texto sigue aquí: intenta de nuevo."]
@@ -908,6 +910,10 @@ def subir_adjuntos(acta_id):
     except BaseException:
         for ruta in rutas:  # la transacción se revirtió: no dejes archivos huérfanos
             adj.borrar_de_disco(ruta)
+        if isinstance(sys.exc_info()[1], psycopg2.errors.ObjectNotInPrerequisiteState):
+            # US-013: el acta se cerró mientras se subían los archivos
+            flash("El acta ya no está abierta: no se pueden adjuntar más archivos.", "error")
+            return destino
         if isinstance(sys.exc_info()[1], psycopg2.Error):
             current_app.logger.exception("Error de base de datos al subir adjuntos")
             flash("No pudimos guardar los archivos. Intenta de nuevo.", "error")
@@ -974,6 +980,9 @@ def eliminar_adjunto(acta_id, adjunto_id):
                     cur.execute("DELETE FROM acta_adjuntos WHERE id = %s", (adjunto_id,))
                     archivo_a_borrar = fila["nombre_archivo"]
                     flash("Archivo eliminado.", "ok")
+    except psycopg2.errors.ObjectNotInPrerequisiteState:
+        archivo_a_borrar = None  # US-013: el acta se cerró en ese momento; el archivo se queda
+        flash("El acta ya no está abierta: no se pueden quitar archivos.", "error")
     except psycopg2.Error:
         current_app.logger.exception("Error de base de datos al eliminar el adjunto")
         flash("No pudimos eliminar el archivo. Intenta de nuevo.", "error")
