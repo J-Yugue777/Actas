@@ -220,5 +220,5 @@ ORDER BY r.id, v.centro;
 
 COMMIT;
 
--- Para listar los centros de una regional en el formulario de crear acta
+-- Búsquedas de centros por regional (y la llave foránea regional_id)
 CREATE INDEX IF NOT EXISTS idx_centros_formacion_regional ON centros_formacion (regional_id, nombre);
