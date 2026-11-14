@@ -103,8 +103,9 @@
   </div>
   {% endif %}
   {% set sin_texto = errores_aporte and not aporte.desarrollo and not aporte.conclusiones %}
+  {# Si vuelve con errores (400/503) el ancla lleva el foco a la caja; al guardar, la redirección va a #mi-aporte #}
   <form class="form-aporte" method="post" id="form-aporte"
-        action="{{ url_for('actas.guardar_aporte', acta_id=acta.id) }}#mi-aporte">
+        action="{{ url_for('actas.guardar_aporte', acta_id=acta.id) }}#errores-aporte">
     {% for campo, etiqueta, ayuda in [
          ('desarrollo', 'Desarrollo de la reunión', 'Relata lo que se trató en la reunión, punto por punto.'),
          ('conclusiones', 'Conclusiones', 'Acuerdos y conclusiones a las que se llegó.')] %}

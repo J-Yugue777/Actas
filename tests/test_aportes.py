@@ -211,6 +211,12 @@ class AvisosAporteTest(unittest.TestCase):
         self.assertEqual(html.count("Tu aporte quedó guardado."), 1)
         self.assertLess(html.index("Tu aporte quedó guardado."), html.index('class="encabezado-acta"'))
 
+    def test_con_errores_el_ancla_del_formulario_es_la_caja(self):
+        # Tras un 400 o 503 el navegador da el foco al ancla: debe ser la caja de errores
+        html = self.pintar([], errores_aporte=["Escribe el desarrollo o las conclusiones de tu aporte."])
+        self.assertIn('id="errores-aporte" tabindex="-1"', html)
+        self.assertIn('action="/actas/7/aporte#errores-aporte"', html)
+
     def test_cada_campo_trae_su_aviso_de_pegado_recortado(self):
         html = self.pintar([])
         for campo in ("desarrollo", "conclusiones"):

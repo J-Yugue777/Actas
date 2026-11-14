@@ -269,6 +269,8 @@
 .panel-cab.envuelve { flex-wrap: wrap; row-gap: 0.25rem; }
 #mi-aporte .alerta-lista { margin-top: 0; }
 #errores-aporte:focus { outline: none; }
+/* La barra superior es sticky: al saltar al ancla deja espacio para que no la tape */
+#errores-aporte { scroll-margin-top: 6rem; }
 
 .aporte { min-width: 0; padding: 1rem 1.15rem; border: 1px solid var(--borde); border-radius: 12px; }
 .aporte + .aporte { margin-top: 0.9rem; }
