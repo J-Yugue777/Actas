@@ -1,66 +1,220 @@
 """
-US-020 · Aporte de cada participante al acta: desarrollo de la reunión y conclusiones.
+US-013 · Aporte del participante, compromisos y firma.
 
-Límite real (NFR-02): MAX_LARGO_APORTE = 50.000 caracteres por campo.
-- Son unas 15 páginas carta a espacio sencillo (~3.300 caracteres por página):
-  alcanza para el relato completo de una reunión larga sin truncarlo.
-- Pone un techo a lo que viaja en cada envío, a lo que se guarda por persona y a
-  lo que se dibuja en la página y en el PDF del acta.
-- Es el MISMO número del CHECK de la base de datos
-  (db/migraciones/US-020_aporte_textos_largos.sql). Si cambias uno, cambia el otro.
-
-Cómo se cuenta: len() de Python, es decir, una tilde, una eñe o un emoji valen 1.
-El salto de línea vale 1: el navegador lo envía como \\r\\n, por eso se normaliza
-a \\n ANTES de contar. Solo se recortan los espacios y los caracteres invisibles
-(BOM, ancho cero) al inicio y al final del texto completo; los saltos de línea y
-los espacios internos se conservan.
+- Aporte: cada participante escribe su desarrollo y conclusiones (acta abierta).
+  Textos largos (US-020): el límite y la normalización están en aporte_texto.py.
+- Compromisos: actividad, fecha, responsable (otro participante del acta) y la
+  firma de quien lo registra.
+- Firma: imagen JPG/PNG que la persona sube una vez y se reutiliza en los
+  compromisos y en la tabla de asistentes.
 """
+from datetime import date
 
-MAX_LARGO_APORTE = 50_000
+import psycopg2
+from flask import (Blueprint, abort, current_app, flash, redirect, request,
+                   send_from_directory, session, url_for)
 
-# Flask lee en memoria los formularios normales (no multipart) y por defecto los
-# corta en 500 KB con un error 413, perdiendo lo escrito. Peor caso del aporte: un
-# emoji ocupa 4 bytes en UTF-8 y cada byte viaja como %XX (3 bytes) = 12 bytes por
-# carácter; 2 campos x 50.000 x 12 = 1,2 MB. Con 2 MB queda margen. Ver app.py.
-MAX_BYTES_FORMULARIO = 2 * 1024 * 1024
+import adjuntos as adj
+import aporte_texto
+from actas import _acceso, _entero, _mostrar_acta, login_requerido, transaccion
 
-# Invisibles que str.strip() no quita: BOM (U+FEFF), espacios de ancho cero
-# (U+200B a U+200D) y unión de palabras (U+2060). Un texto hecho solo de ellos se ve vacío.
-INVISIBLES = "\ufeff\u200b\u200c\u200d\u2060"
-# Lo que se recorta en los extremos: los espacios de str.strip() (ninguno pasa de
-# U+3000) más los invisibles. Debe coincidir con contar() de ver_acta.html.
-_EXTREMOS = "".join(c for c in map(chr, range(0x3001)) if c.isspace()) + INVISIBLES
+aportes_bp = Blueprint("aportes", __name__)
 
-# campo del formulario y de acta_participantes -> cómo se nombra en los mensajes
-CAMPOS = {
-    "desarrollo": "El desarrollo tiene",
-    "conclusiones": "Las conclusiones tienen",
-}
+MAX_ACTIVIDAD = 300
+MAX_BYTES_FIRMA = 2 * 1024 * 1024
 
 
-def miles(n):
-    """50000 -> '50.000' (separador de miles con punto)."""
-    return f"{n:,}".replace(",", ".")
+def _volver(acta_id, ancla):
+    return redirect(url_for("actas.ver", acta_id=acta_id) + f"#{ancla}")
 
 
-def normalizar(texto):
-    """Deja el texto como se guarda: saltos \\n y sin espacios ni invisibles en los extremos. Vacío -> None."""
-    texto = (texto or "").replace("\r\n", "\n").replace("\r", "\n")
-    texto = texto.replace("\x00", "")  # PostgreSQL no admite el carácter nulo en un TEXT
-    return texto.strip(_EXTREMOS) or None
+# --------------------------------------------------------------------- aporte
+@aportes_bp.route("/actas/<int:acta_id>/aporte", methods=["POST"])
+@login_requerido
+def guardar_aporte(acta_id):
+    """Cada participante registra o corrige su desarrollo y sus conclusiones (US-020)."""
+    usuario_id = session["usuario_id"]
+    aporte = aporte_texto.leer_aporte(request.form)
+    errores = aporte_texto.validar_aporte(aporte)
+    abierta = guardado = False
+    try:
+        with transaccion() as cur:
+            _acceso(cur, acta_id, usuario_id)  # 404 si no existe, 403 si no tiene acceso
+            # Bloquea el acta hasta terminar: nadie la cierra a mitad del guardado
+            cur.execute("SELECT estado FROM actas WHERE id = %s FOR SHARE", (acta_id,))
+            abierta = cur.fetchone()["estado"] == "abierta"
+            # Solo escribe quien tiene fila de participante (el líder también la necesita);
+            # Administrador y Coordinador que no participan solo leen. 403 sea cual sea el texto.
+            cur.execute(
+                "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s FOR UPDATE",
+                (acta_id, usuario_id),
+            )
+            if cur.fetchone() is None:
+                abort(403)
+            if abierta and not errores:
+                cur.execute(
+                    """
+                    UPDATE acta_participantes
+                    SET desarrollo = %s, conclusiones = %s, aporte_actualizado_en = now()
+                    WHERE acta_id = %s AND usuario_id = %s
+                    """,
+                    (aporte["desarrollo"], aporte["conclusiones"], acta_id, usuario_id),
+                )
+                guardado = True
+    except psycopg2.Error:
+        current_app.logger.exception("Error de base de datos al guardar el aporte")
+        errores = ["No pudimos guardar tu aporte. Tu texto sigue aquí: intenta de nuevo."]
+        return _mostrar_acta(acta_id, usuario_id, 503, aporte=aporte, errores_aporte=errores)
+
+    if not abierta:
+        flash("El acta ya no está abierta: no se puede registrar ni cambiar el aporte.", "error")
+        return redirect(url_for("actas.ver", acta_id=acta_id))
+    if guardado:
+        # aporte_ok/aporte_error se pintan dentro de #mi-aporte, a la vista al llegar al ancla
+        flash("Tu aporte quedó guardado.", "aporte_ok")
+        return redirect(url_for("actas.ver", acta_id=acta_id) + "#mi-aporte")
+    # Error de validación: no se redirige, para no perder lo que la persona escribió
+    return _mostrar_acta(acta_id, usuario_id, 400, aporte=aporte, errores_aporte=errores)
 
 
-def leer_aporte(form):
-    return {campo: normalizar(form.get(campo)) for campo in CAMPOS}
+# ---------------------------------------------------------------- compromisos
+@aportes_bp.route("/actas/<int:acta_id>/compromisos", methods=["POST"])
+@login_requerido
+def agregar_compromiso(acta_id):
+    usuario_id = session["usuario_id"]
+    actividad = " ".join(request.form.get("actividad", "").split())
+    responsable_id = _entero(request.form.get("responsable_id"))
+    try:
+        fecha = date.fromisoformat(request.form.get("fecha_entrega", ""))
+    except ValueError:
+        fecha = None
+
+    if not actividad or len(actividad) > MAX_ACTIVIDAD:
+        flash(f"Escribe la actividad (máximo {MAX_ACTIVIDAD} caracteres).", "error")
+        return _volver(acta_id, "compromisos")
+    if fecha is None:
+        flash("Escribe una fecha de entrega válida.", "error")
+        return _volver(acta_id, "compromisos")
+    if responsable_id is None:
+        flash("Elige el responsable del compromiso.", "error")
+        return _volver(acta_id, "compromisos")
+
+    try:
+        with transaccion() as cur:
+            acceso = _acceso(cur, acta_id, usuario_id)
+            if not acceso["participa"]:
+                abort(403)
+            if acceso["acta"]["estado"] != "abierta":
+                flash("El acta ya no está abierta: no se pueden agregar compromisos.", "error")
+                return _volver(acta_id, "compromisos")
+            cur.execute(
+                "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s",
+                (acta_id, responsable_id),
+            )
+            if cur.fetchone() is None:
+                flash("El responsable debe ser participante del acta.", "error")
+                return _volver(acta_id, "compromisos")
+            cur.execute(
+                "INSERT INTO acta_compromisos "
+                "(acta_id, actividad, fecha_entrega, responsable_id, completado, creado_por) "
+                "VALUES (%s, %s, %s, %s, FALSE, %s)",
+                (acta_id, actividad, fecha, responsable_id, usuario_id),
+            )
+        flash("Compromiso agregado.", "ok")
+    except psycopg2.Error:
+        current_app.logger.exception("Error de base de datos al agregar el compromiso")
+        flash("No pudimos guardar el compromiso. Intenta de nuevo.", "error")
+    return _volver(acta_id, "compromisos")
 
 
-def validar_aporte(aporte):
-    """Devuelve la lista de errores (vacía si el aporte se puede guardar)."""
-    if not any(aporte.values()):
-        return ["Escribe el desarrollo o las conclusiones de tu aporte."]
-    errores = []
-    for campo, sujeto in CAMPOS.items():
-        largo = len(aporte[campo] or "")
-        if largo > MAX_LARGO_APORTE:
-            errores.append(f"{sujeto} {miles(largo)} caracteres; el máximo es {miles(MAX_LARGO_APORTE)}.")
-    return errores
+@aportes_bp.route("/actas/<int:acta_id>/compromisos/<int:compromiso_id>/eliminar", methods=["POST"])
+@login_requerido
+def eliminar_compromiso(acta_id, compromiso_id):
+    usuario_id = session["usuario_id"]
+    try:
+        with transaccion() as cur:
+            acceso = _acceso(cur, acta_id, usuario_id)
+            if acceso["acta"]["estado"] != "abierta":
+                flash("El acta ya no está abierta: no se pueden quitar compromisos.", "error")
+                return _volver(acta_id, "compromisos")
+            cur.execute(
+                "SELECT creado_por FROM acta_compromisos WHERE id = %s AND acta_id = %s",
+                (compromiso_id, acta_id),
+            )
+            fila = cur.fetchone()
+            if fila is None:
+                flash("Ese compromiso ya no existe.", "error")
+            elif fila["creado_por"] != usuario_id and not acceso["es_lider"]:
+                abort(403)  # solo quien lo registró o el líder del acta
+            else:
+                cur.execute("DELETE FROM acta_compromisos WHERE id = %s", (compromiso_id,))
+                flash("Compromiso eliminado.", "ok")
+    except psycopg2.Error:
+        current_app.logger.exception("Error de base de datos al eliminar el compromiso")
+        flash("No pudimos eliminar el compromiso. Intenta de nuevo.", "error")
+    return _volver(acta_id, "compromisos")
+
+
+# ---------------------------------------------------------------------- firma
+@aportes_bp.route("/firma", methods=["POST"])
+@login_requerido
+def subir_firma():
+    destino = request.referrer or url_for("inicio")
+    archivo = request.files.get("firma")
+    if not archivo or not archivo.filename:
+        flash("Selecciona la imagen de tu firma.", "error")
+        return redirect(destino)
+    try:
+        extension, mime, es_imagen, tamano = adj.validar_archivo(archivo)
+        if not es_imagen:
+            raise ValueError("la firma debe ser una imagen JPG o PNG.")
+        if tamano > MAX_BYTES_FIRMA:
+            raise ValueError("la firma pesa más de 2 MB.")
+    except ValueError as error:
+        flash(f"No se guardó la firma: {error}", "error")
+        return redirect(destino)
+
+    nuevo = adj.guardar_en_disco(archivo, extension)
+    anterior = None
+    try:
+        with transaccion() as cur:
+            cur.execute("SELECT firma_archivo FROM usuarios WHERE id = %s", (session["usuario_id"],))
+            anterior = cur.fetchone()["firma_archivo"]
+            cur.execute(
+                "UPDATE usuarios SET firma_archivo = %s, firma_mime = %s WHERE id = %s",
+                (nuevo, mime, session["usuario_id"]),
+            )
+    except psycopg2.Error:
+        adj.borrar_de_disco(nuevo)
+        current_app.logger.exception("Error de base de datos al guardar la firma")
+        flash("No pudimos guardar tu firma. Intenta de nuevo.", "error")
+        return redirect(destino)
+    if anterior:
+        adj.borrar_de_disco(anterior)
+    flash("Tu firma quedó guardada.", "ok")
+    return redirect(destino)
+
+
+@aportes_bp.route("/actas/<int:acta_id>/firma/<int:usuario_id>")
+@login_requerido
+def ver_firma(acta_id, usuario_id):
+    """Firma de un participante; solo la ve quien tiene acceso al acta."""
+    try:
+        with transaccion() as cur:
+            _acceso(cur, acta_id, session["usuario_id"])
+            cur.execute(
+                "SELECT u.firma_archivo, u.firma_mime FROM usuarios u "
+                "JOIN acta_participantes p ON p.usuario_id = u.id "
+                "WHERE p.acta_id = %s AND u.id = %s",
+                (acta_id, usuario_id),
+            )
+            fila = cur.fetchone()
+    except psycopg2.Error:
+        current_app.logger.exception("Error de base de datos al leer la firma")
+        abort(503)
+    if fila is None or not fila["firma_archivo"]:
+        abort(404)
+    respuesta = send_from_directory(adj.carpeta_subidas(), fila["firma_archivo"], mimetype=fila["firma_mime"])
+    respuesta.headers["X-Content-Type-Options"] = "nosniff"
+    respuesta.headers["Cache-Control"] = "private, no-cache"
+    return respuesta

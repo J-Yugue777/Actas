@@ -21,11 +21,11 @@ from flask import (Blueprint, abort, current_app, flash, redirect,
                    render_template, request, send_from_directory, session, url_for)
 
 import adjuntos as adj
-import aportes
+import aporte_texto
 from db import get_connection
 
 actas_bp = Blueprint("actas", __name__, url_prefix="/actas")
-actas_bp.add_app_template_filter(aportes.miles, "miles")  # {{ 50000|miles }} -> 50.000
+actas_bp.add_app_template_filter(aporte_texto.miles, "miles")  # {{ 50000|miles }} -> 50.000
 
 ROL_LIDER = "Instructor líder de ficha"
 ROLES_TODAS_LAS_FICHAS = ("Administrador", "Coordinador académico")
@@ -416,7 +416,8 @@ def contexto_ver(cur, acta_id, usuario_id):
         SELECT p.usuario_id, u.nombre, u.apellido, r.nombre AS rol, (u.id = %s) AS es_creador,
                (p.desarrollo IS NOT NULL OR p.conclusiones IS NOT NULL) AS aporto,
                p.desarrollo, p.conclusiones,
-               p.aporte_actualizado_en AT TIME ZONE 'America/Bogota' AS aporte_actualizado_en
+               p.aporte_actualizado_en AT TIME ZONE 'America/Bogota' AS aporte_actualizado_en,
+               u.id AS uid, (u.firma_archivo IS NOT NULL) AS tiene_firma
         FROM acta_participantes p
         JOIN usuarios u ON u.id = p.usuario_id
         JOIN roles r ON r.id = u.rol_id
@@ -426,6 +427,23 @@ def contexto_ver(cur, acta_id, usuario_id):
         (acta["lider_id"], acta_id, acta["lider_id"]),
     )
     participantes = cur.fetchall()
+    cur.execute(
+        """
+        SELECT c.id, c.actividad, c.fecha_entrega, c.completado, c.creado_por,
+               c.responsable_id,
+               COALESCE(ur.nombre || ' ' || ur.apellido, c.responsable_texto) AS responsable,
+               (uc.firma_archivo IS NOT NULL) AS tiene_firma
+        FROM acta_compromisos c
+        LEFT JOIN usuarios ur ON ur.id = c.responsable_id
+        LEFT JOIN usuarios uc ON uc.id = c.creado_por
+        WHERE c.acta_id = %s
+        ORDER BY c.fecha_entrega, c.id
+        """,
+        (acta_id,),
+    )
+    compromisos = cur.fetchall()
+    cur.execute("SELECT (firma_archivo IS NOT NULL) AS tiene FROM usuarios WHERE id = %s", (usuario_id,))
+    tengo_firma = cur.fetchone()["tiene"]
     lista_adjuntos = adj.listar_adjuntos(cur, acta_id)
     puede_adjuntar = acta["estado"] == "abierta" and (
         es_participante or acta["lider_id"] == usuario_id)
@@ -433,6 +451,8 @@ def contexto_ver(cur, acta_id, usuario_id):
 
     return dict(
         acta=acta, meses=MESES, participantes=participantes,
+        compromisos=compromisos, tengo_firma=tengo_firma,
+        es_participante=es_participante, es_lider=acta["lider_id"] == usuario_id,
         adjuntos=lista_adjuntos, puede_adjuntar=puede_adjuntar,
         puede_gestionar_adjuntos=acta["estado"] == "abierta",
         max_mb=adj.MAX_BYTES // (1024 * 1024), max_bytes=adj.MAX_BYTES,
@@ -442,9 +462,9 @@ def contexto_ver(cur, acta_id, usuario_id):
         objetivos=[p["descripcion"] for p in puntos if p["tipo"] == "objetivo"],
         # US-020: el formulario "Mi aporte" solo es para participantes con el acta abierta
         puede_aportar=acta["estado"] == "abierta" and es_participante,
-        aporte={c: mio[c] if mio else None for c in aportes.CAMPOS},
+        aporte={c: mio[c] if mio else None for c in aporte_texto.CAMPOS},
         aporte_guardado_en=mio["aporte_actualizado_en"] if mio else None,
-        errores_aporte=[], max_aporte=aportes.MAX_LARGO_APORTE,
+        errores_aporte=[], max_aporte=aporte_texto.MAX_LARGO_APORTE,
     )
 
 
@@ -466,54 +486,6 @@ def ver(acta_id):
 
 
 # ------------------------------------------- US-020 · aporte del participante
-@actas_bp.route("/<int:acta_id>/aporte", methods=["POST"])
-@login_requerido
-def guardar_aporte(acta_id):
-    """Cada participante registra o corrige su desarrollo y sus conclusiones."""
-    usuario_id = session["usuario_id"]
-    aporte = aportes.leer_aporte(request.form)
-    errores = aportes.validar_aporte(aporte)
-    abierta = guardado = False
-    try:
-        with transaccion() as cur:
-            _acceso(cur, acta_id, usuario_id)  # 404 si no existe, 403 si no tiene acceso
-            # Bloquea el acta hasta terminar: nadie la cierra a mitad del guardado
-            cur.execute("SELECT estado FROM actas WHERE id = %s FOR SHARE", (acta_id,))
-            abierta = cur.fetchone()["estado"] == "abierta"
-            # Solo escribe quien tiene fila de participante (el líder también la necesita);
-            # Administrador y Coordinador que no participan solo leen. 403 sea cual sea el texto.
-            cur.execute(
-                "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s FOR UPDATE",
-                (acta_id, usuario_id),
-            )
-            if cur.fetchone() is None:
-                abort(403)
-            if abierta and not errores:
-                cur.execute(
-                    """
-                    UPDATE acta_participantes
-                    SET desarrollo = %s, conclusiones = %s, aporte_actualizado_en = now()
-                    WHERE acta_id = %s AND usuario_id = %s
-                    """,
-                    (aporte["desarrollo"], aporte["conclusiones"], acta_id, usuario_id),
-                )
-                guardado = True
-    except psycopg2.Error:
-        current_app.logger.exception("Error de base de datos al guardar el aporte")
-        errores = ["No pudimos guardar tu aporte. Tu texto sigue aquí: intenta de nuevo."]
-        return _mostrar_acta(acta_id, usuario_id, 503, aporte=aporte, errores_aporte=errores)
-
-    if not abierta:
-        flash("El acta ya no está abierta: no se puede registrar ni cambiar el aporte.", "error")
-        return redirect(url_for("actas.ver", acta_id=acta_id))
-    if guardado:
-        # aporte_ok/aporte_error se pintan dentro de #mi-aporte, a la vista al llegar al ancla
-        flash("Tu aporte quedó guardado.", "aporte_ok")
-        return redirect(url_for("actas.ver", acta_id=acta_id) + "#mi-aporte")
-    # Error de validación: no se redirige, para no perder lo que la persona escribió
-    return _mostrar_acta(acta_id, usuario_id, 400, aporte=aporte, errores_aporte=errores)
-
-
 # ------------------------------------------------------- US-012 · adjuntos
 def _acceso(cur, acta_id, usuario_id):
     """Datos de acceso del usuario al acta. 404 si no existe, 403 si no participa."""
@@ -654,9 +626,9 @@ def eliminar_adjunto(acta_id, adjunto_id):
 @actas_bp.app_errorhandler(413)
 def archivo_demasiado_grande(error):
     """La petición completa superó MAX_CONTENT_LENGTH o MAX_FORM_MEMORY_SIZE (ver app.py)."""
-    if request.endpoint == "actas.guardar_aporte":
+    if request.endpoint == "aportes.guardar_aporte":
         flash("Tu aporte es demasiado grande para enviarlo. Recorta el texto: máximo "
-              f"{aportes.miles(aportes.MAX_LARGO_APORTE)} caracteres en el desarrollo y otros tantos "
+              f"{aporte_texto.miles(aporte_texto.MAX_LARGO_APORTE)} caracteres en el desarrollo y otros tantos "
               "en las conclusiones.", "aporte_error")
         return redirect(url_for("actas.ver", acta_id=request.view_args["acta_id"]) + "#mi-aporte")
     if request.endpoint == "actas.subir_adjuntos":
