@@ -43,6 +43,16 @@ class NormalizarTest(unittest.TestCase):
         for valor in (None, "", "   ", "\r\n\r\n", " \t \n"):
             self.assertIsNone(normalizar(valor), repr(valor))
 
+    def test_solo_caracteres_invisibles_queda_none(self):
+        # BOM y espacios de ancho cero: str.strip() no los quita y el aporte se vería en blanco
+        for valor in ("\ufeff", "\u200b", " \ufeff\r\n\u200b\u200c\u200d\u2060 ", "\u200b \u200b \u200b"):
+            self.assertIsNone(normalizar(valor), repr(valor))
+
+    def test_invisibles_solo_se_recortan_en_los_extremos(self):
+        # El ZWJ interno une el emoji de familia: se conserva
+        familia = "\U0001F468\u200d\U0001F469\u200d\U0001F467"
+        self.assertEqual(normalizar("\ufeff Hola " + familia + "\u200b\n"), "Hola " + familia)
+
     def test_quita_el_caracter_nulo(self):
         # PostgreSQL no admite \x00 dentro de un TEXT
         self.assertEqual(normalizar("a\x00b"), "ab")
@@ -83,6 +93,11 @@ class ValidarTest(unittest.TestCase):
 
     def test_ambos_vacios_da_error(self):
         aporte = leer_aporte({"desarrollo": "  \r\n ", "conclusiones": ""})
+        self.assertEqual(validar_aporte(aporte), ["Escribe el desarrollo o las conclusiones de tu aporte."])
+
+    def test_solo_invisibles_en_ambos_da_error(self):
+        aporte = leer_aporte({"desarrollo": "\ufeff", "conclusiones": "\u200b\r\n"})
+        self.assertEqual(aporte, {"desarrollo": None, "conclusiones": None})
         self.assertEqual(validar_aporte(aporte), ["Escribe el desarrollo o las conclusiones de tu aporte."])
 
     def test_sin_campos_en_el_formulario_da_error(self):

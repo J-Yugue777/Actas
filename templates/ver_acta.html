@@ -251,8 +251,15 @@
     var sinGuardar = {{ 'true' if errores_aporte else 'false' }};  // volvió con errores: nada se guardó
     var enviando = false;
     function miles(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
-    // Cuenta igual que el servidor: el salto de línea vale 1 y no cuentan los espacios de los extremos
-    function contar(t) { return Array.from(t.replace(/\r\n?/g, '\n').trim()).length; }
+    // Cuenta igual que el servidor: el salto de línea vale 1 y no cuentan los espacios ni los
+    // invisibles (BOM, ancho cero) de los extremos. \x1c-\x1f y \x85 son espacios en Python, no en \s.
+    var extremo = /^[\s\x1c-\x1f\x85\u200b-\u200d\u2060]$/;
+    function contar(t) {
+      var c = Array.from(t.replace(/\r\n?/g, '\n')), i = 0, j = c.length;
+      while (i < j && extremo.test(c[i])) i++;
+      while (j > i && extremo.test(c[j - 1])) j--;
+      return j - i;
+    }
     function puntos(t) { return Array.from(t).length; }  // un emoji vale 1, como en el servidor
     Array.prototype.forEach.call(campos, function (campo) {
       var contador = document.getElementById(campo.dataset.contador);

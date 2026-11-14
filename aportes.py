@@ -11,8 +11,9 @@ Límite real (NFR-02): MAX_LARGO_APORTE = 50.000 caracteres por campo.
 
 Cómo se cuenta: len() de Python, es decir, una tilde, una eñe o un emoji valen 1.
 El salto de línea vale 1: el navegador lo envía como \\r\\n, por eso se normaliza
-a \\n ANTES de contar. Solo se recortan los espacios al inicio y al final del
-texto completo; los saltos de línea y los espacios internos se conservan.
+a \\n ANTES de contar. Solo se recortan los espacios y los caracteres invisibles
+(BOM, ancho cero) al inicio y al final del texto completo; los saltos de línea y
+los espacios internos se conservan.
 """
 
 MAX_LARGO_APORTE = 50_000
@@ -22,6 +23,13 @@ MAX_LARGO_APORTE = 50_000
 # emoji ocupa 4 bytes en UTF-8 y cada byte viaja como %XX (3 bytes) = 12 bytes por
 # carácter; 2 campos x 50.000 x 12 = 1,2 MB. Con 2 MB queda margen. Ver app.py.
 MAX_BYTES_FORMULARIO = 2 * 1024 * 1024
+
+# Invisibles que str.strip() no quita: BOM (U+FEFF), espacios de ancho cero
+# (U+200B a U+200D) y unión de palabras (U+2060). Un texto hecho solo de ellos se ve vacío.
+INVISIBLES = "\ufeff\u200b\u200c\u200d\u2060"
+# Lo que se recorta en los extremos: los espacios de str.strip() (ninguno pasa de
+# U+3000) más los invisibles. Debe coincidir con contar() de ver_acta.html.
+_EXTREMOS = "".join(c for c in map(chr, range(0x3001)) if c.isspace()) + INVISIBLES
 
 # campo del formulario y de acta_participantes -> cómo se nombra en los mensajes
 CAMPOS = {
@@ -36,10 +44,10 @@ def miles(n):
 
 
 def normalizar(texto):
-    """Deja el texto como se guarda: saltos \\n y sin espacios en los extremos. Vacío -> None."""
+    """Deja el texto como se guarda: saltos \\n y sin espacios ni invisibles en los extremos. Vacío -> None."""
     texto = (texto or "").replace("\r\n", "\n").replace("\r", "\n")
     texto = texto.replace("\x00", "")  # PostgreSQL no admite el carácter nulo en un TEXT
-    return texto.strip() or None
+    return texto.strip(_EXTREMOS) or None
 
 
 def leer_aporte(form):
