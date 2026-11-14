@@ -21,9 +21,11 @@ from flask import (Blueprint, abort, current_app, flash, redirect,
                    render_template, request, send_from_directory, session, url_for)
 
 import adjuntos as adj
+import aporte_texto
 from db import get_connection
 
 actas_bp = Blueprint("actas", __name__, url_prefix="/actas")
+actas_bp.add_app_template_filter(aporte_texto.miles, "miles")  # {{ 50000|miles }} -> 50.000
 
 ROL_LIDER = "Instructor líder de ficha"
 ROLES_TODAS_LAS_FICHAS = ("Administrador", "Coordinador académico")
@@ -370,94 +372,86 @@ def crear():
     )
 
 
-@actas_bp.route("/<int:acta_id>")
-@login_requerido
-def ver(acta_id):
-    usuario_id = session["usuario_id"]
-    try:
-        with transaccion() as cur:
-            cur.execute(
-                """
-                SELECT a.*, rg.nombre AS regional, c.nombre AS centro,
-                       f.numero AS ficha, p.nombre AS programa,
-                       u.nombre || ' ' || u.apellido AS creador
-                FROM actas a
-                JOIN regionales rg ON rg.id = a.regional_id
-                JOIN centros_formacion c ON c.id = a.centro_id
-                JOIN usuarios u ON u.id = a.lider_id
-                LEFT JOIN fichas f ON f.id = a.ficha_id
-                LEFT JOIN programas p ON p.id = f.programa_id
-                WHERE a.id = %s
-                """,
-                (acta_id,),
-            )
-            acta = cur.fetchone()
-            if acta is None:
-                abort(404)
+def contexto_ver(cur, acta_id, usuario_id):
+    """Datos de la plantilla ver_acta.html. 404 si el acta no existe, 403 si no tiene acceso."""
+    cur.execute(
+        """
+        SELECT a.*, rg.nombre AS regional, c.nombre AS centro,
+               f.numero AS ficha, p.nombre AS programa,
+               u.nombre || ' ' || u.apellido AS creador
+        FROM actas a
+        JOIN regionales rg ON rg.id = a.regional_id
+        JOIN centros_formacion c ON c.id = a.centro_id
+        JOIN usuarios u ON u.id = a.lider_id
+        LEFT JOIN fichas f ON f.id = a.ficha_id
+        LEFT JOIN programas p ON p.id = f.programa_id
+        WHERE a.id = %s
+        """,
+        (acta_id,),
+    )
+    acta = cur.fetchone()
+    if acta is None:
+        abort(404)
 
-            cur.execute(
-                "SELECT r.nombre FROM usuarios u JOIN roles r ON r.id = u.rol_id WHERE u.id = %s",
-                (usuario_id,),
-            )
-            rol = cur.fetchone()["nombre"]
-            cur.execute(
-                "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s",
-                (acta_id, usuario_id),
-            )
-            es_participante = cur.fetchone() is not None
-            if not (es_participante or acta["lider_id"] == usuario_id or rol in ROLES_TODAS_LAS_FICHAS):
-                abort(403)
+    cur.execute(
+        "SELECT r.nombre FROM usuarios u JOIN roles r ON r.id = u.rol_id WHERE u.id = %s",
+        (usuario_id,),
+    )
+    rol = cur.fetchone()["nombre"]
+    cur.execute(
+        "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s",
+        (acta_id, usuario_id),
+    )
+    es_participante = cur.fetchone() is not None
+    if not (es_participante or acta["lider_id"] == usuario_id or rol in ROLES_TODAS_LAS_FICHAS):
+        abort(403)
 
-            cur.execute(
-                "SELECT tipo, descripcion FROM acta_items WHERE acta_id = %s ORDER BY tipo, orden",
-                (acta_id,),
-            )
-            puntos = cur.fetchall()
-            cur.execute(
-                """
-                SELECT u.nombre, u.apellido, r.nombre AS rol, (u.id = %s) AS es_creador,
-                       (p.desarrollo IS NOT NULL OR p.conclusiones IS NOT NULL) AS aporto,
-                       u.id AS uid, (u.firma_archivo IS NOT NULL) AS tiene_firma
-                FROM acta_participantes p
-                JOIN usuarios u ON u.id = p.usuario_id
-                JOIN roles r ON r.id = u.rol_id
-                WHERE p.acta_id = %s
-                ORDER BY (u.id = %s) DESC, u.apellido, u.nombre
-                """,
-                (acta["lider_id"], acta_id, acta["lider_id"]),
-            )
-            participantes = cur.fetchall()
-            cur.execute(
-                "SELECT desarrollo, conclusiones FROM acta_participantes "
-                "WHERE acta_id = %s AND usuario_id = %s", (acta_id, usuario_id))
-            mi_aporte = cur.fetchone()
-            cur.execute(
-                """
-                SELECT c.id, c.actividad, c.fecha_entrega, c.completado, c.creado_por,
-                       c.responsable_id,
-                       COALESCE(ur.nombre || ' ' || ur.apellido, c.responsable_texto) AS responsable,
-                       (uc.firma_archivo IS NOT NULL) AS tiene_firma
-                FROM acta_compromisos c
-                LEFT JOIN usuarios ur ON ur.id = c.responsable_id
-                LEFT JOIN usuarios uc ON uc.id = c.creado_por
-                WHERE c.acta_id = %s
-                ORDER BY c.fecha_entrega, c.id
-                """,
-                (acta_id,),
-            )
-            compromisos = cur.fetchall()
-            cur.execute("SELECT (firma_archivo IS NOT NULL) AS tiene FROM usuarios WHERE id = %s", (usuario_id,))
-            tengo_firma = cur.fetchone()["tiene"]
-            lista_adjuntos = adj.listar_adjuntos(cur, acta_id)
-            puede_adjuntar = acta["estado"] == "abierta" and (
-                es_participante or acta["lider_id"] == usuario_id)
-    except psycopg2.Error:
-        current_app.logger.exception("Error de base de datos al ver el acta")
-        abort(503)
+    cur.execute(
+        "SELECT tipo, descripcion FROM acta_items WHERE acta_id = %s ORDER BY tipo, orden",
+        (acta_id,),
+    )
+    puntos = cur.fetchall()
+    cur.execute(
+        """
+        SELECT p.usuario_id, u.nombre, u.apellido, r.nombre AS rol, (u.id = %s) AS es_creador,
+               (p.desarrollo IS NOT NULL OR p.conclusiones IS NOT NULL) AS aporto,
+               p.desarrollo, p.conclusiones,
+               p.aporte_actualizado_en AT TIME ZONE 'America/Bogota' AS aporte_actualizado_en,
+               u.id AS uid, (u.firma_archivo IS NOT NULL) AS tiene_firma
+        FROM acta_participantes p
+        JOIN usuarios u ON u.id = p.usuario_id
+        JOIN roles r ON r.id = u.rol_id
+        WHERE p.acta_id = %s
+        ORDER BY (u.id = %s) DESC, u.apellido, u.nombre
+        """,
+        (acta["lider_id"], acta_id, acta["lider_id"]),
+    )
+    participantes = cur.fetchall()
+    cur.execute(
+        """
+        SELECT c.id, c.actividad, c.fecha_entrega, c.completado, c.creado_por,
+               c.responsable_id,
+               COALESCE(ur.nombre || ' ' || ur.apellido, c.responsable_texto) AS responsable,
+               (uc.firma_archivo IS NOT NULL) AS tiene_firma
+        FROM acta_compromisos c
+        LEFT JOIN usuarios ur ON ur.id = c.responsable_id
+        LEFT JOIN usuarios uc ON uc.id = c.creado_por
+        WHERE c.acta_id = %s
+        ORDER BY c.fecha_entrega, c.id
+        """,
+        (acta_id,),
+    )
+    compromisos = cur.fetchall()
+    cur.execute("SELECT (firma_archivo IS NOT NULL) AS tiene FROM usuarios WHERE id = %s", (usuario_id,))
+    tengo_firma = cur.fetchone()["tiene"]
+    lista_adjuntos = adj.listar_adjuntos(cur, acta_id)
+    puede_adjuntar = acta["estado"] == "abierta" and (
+        es_participante or acta["lider_id"] == usuario_id)
+    mio = next((p for p in participantes if p["usuario_id"] == usuario_id), None)
 
-    return render_template(
-        "ver_acta.html", acta=acta, meses=MESES, participantes=participantes,
-        mi_aporte=mi_aporte, compromisos=compromisos, tengo_firma=tengo_firma,
+    return dict(
+        acta=acta, meses=MESES, participantes=participantes,
+        compromisos=compromisos, tengo_firma=tengo_firma,
         es_participante=es_participante, es_lider=acta["lider_id"] == usuario_id,
         adjuntos=lista_adjuntos, puede_adjuntar=puede_adjuntar,
         puede_gestionar_adjuntos=acta["estado"] == "abierta",
@@ -466,7 +460,29 @@ def ver(acta_id):
         accept=adj.ACCEPT_HTML,
         agenda=[p["descripcion"] for p in puntos if p["tipo"] == "agenda"],
         objetivos=[p["descripcion"] for p in puntos if p["tipo"] == "objetivo"],
+        # US-020: el formulario "Mi aporte" solo es para participantes con el acta abierta
+        puede_aportar=acta["estado"] == "abierta" and es_participante,
+        aporte={c: mio[c] if mio else None for c in aporte_texto.CAMPOS},
+        aporte_guardado_en=mio["aporte_actualizado_en"] if mio else None,
+        errores_aporte=[], max_aporte=aporte_texto.MAX_LARGO_APORTE,
     )
+
+
+def _mostrar_acta(acta_id, usuario_id, estado_http=200, **cambios):
+    try:
+        with transaccion() as cur:
+            contexto = contexto_ver(cur, acta_id, usuario_id)
+    except psycopg2.Error:
+        current_app.logger.exception("Error de base de datos al ver el acta")
+        abort(503)
+    contexto.update(cambios)
+    return render_template("ver_acta.html", **contexto), estado_http
+
+
+@actas_bp.route("/<int:acta_id>")
+@login_requerido
+def ver(acta_id):
+    return _mostrar_acta(acta_id, session["usuario_id"])
 
 
 # ------------------------------------------------------- US-012 · adjuntos
@@ -608,7 +624,12 @@ def eliminar_adjunto(acta_id, adjunto_id):
 
 @actas_bp.app_errorhandler(413)
 def archivo_demasiado_grande(error):
-    """La petición completa superó MAX_CONTENT_LENGTH (ver app.py)."""
+    """La petición completa superó MAX_CONTENT_LENGTH o MAX_FORM_MEMORY_SIZE (ver app.py)."""
+    if request.endpoint == "aportes.guardar_aporte":
+        flash("Tu aporte es demasiado grande para enviarlo. Recorta el texto: máximo "
+              f"{aporte_texto.miles(aporte_texto.MAX_LARGO_APORTE)} caracteres en el desarrollo y otros tantos "
+              "en las conclusiones.", "aporte_error")
+        return redirect(url_for("actas.ver", acta_id=request.view_args["acta_id"]) + "#mi-aporte")
     if request.endpoint == "actas.subir_adjuntos":
         flash("Los archivos juntos pesan demasiado. Sube menos archivos a la vez "
               f"(máximo {adj.MAX_BYTES // (1024 * 1024)} MB cada uno).", "error")
