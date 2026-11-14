@@ -49,6 +49,21 @@ TIPOS_ITEM = ("agenda", "objetivo")
 MAX_LARGO_ITEM = 500
 
 
+class ActaCerrada(ValueError):
+    """US-013: el acta está cerrada; su agenda y sus objetivos ya no cambian."""
+
+    def __init__(self):
+        super().__init__("El acta está cerrada: ya no se puede editar.")
+
+
+def _bloquear_acta_abierta(cur, acta_id):
+    """Bloquea la fila del acta (FOR UPDATE) y lanza ActaCerrada si ya está cerrada."""
+    cur.execute("SELECT estado FROM actas WHERE id = %s FOR UPDATE", (acta_id,))
+    fila = cur.fetchone()
+    if fila and fila["estado"] == "cerrada":
+        raise ActaCerrada()
+
+
 def acta_del_lider(acta_id, usuario_id):
     """Devuelve el acta si existe y `usuario_id` es su líder; si no, None.
 
@@ -58,7 +73,7 @@ def acta_del_lider(acta_id, usuario_id):
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id FROM actas WHERE id = %s AND lider_id = %s",
+                "SELECT id, estado FROM actas WHERE id = %s AND lider_id = %s",
                 (acta_id, usuario_id),
             )
             return cur.fetchone()
@@ -90,7 +105,7 @@ def agregar_item(acta_id, tipo, descripcion):
     with get_connection() as conn:
         with conn.cursor() as cur:
             # Serializa las altas concurrentes del mismo acta para que `orden` no choque
-            cur.execute("SELECT id FROM actas WHERE id = %s FOR UPDATE", (acta_id,))
+            _bloquear_acta_abierta(cur, acta_id)
             cur.execute(
                 "SELECT 1 FROM acta_items "
                 "WHERE acta_id = %s AND tipo = %s AND LOWER(descripcion) = LOWER(%s)",
@@ -110,7 +125,7 @@ def eliminar_item(acta_id, item_id):
     """Quita un ítem del acta y vuelve a numerar los que quedan. True si existía."""
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM actas WHERE id = %s FOR UPDATE", (acta_id,))
+            _bloquear_acta_abierta(cur, acta_id)
             cur.execute(
                 "DELETE FROM acta_items WHERE id = %s AND acta_id = %s RETURNING tipo",
                 (item_id, acta_id),

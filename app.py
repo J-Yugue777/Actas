@@ -20,9 +20,10 @@ from psycopg2.extras import RealDictCursor
 from db import (
     buscar_usuario_por_correo,
     acta_del_lider, listar_items, agregar_item, eliminar_item,
-    TIPOS_ITEM, MAX_LARGO_ITEM,
+    TIPOS_ITEM, MAX_LARGO_ITEM, ActaCerrada,
 )
 from actas import (actas_bp)
+import aporte_texto
 from aportes import aportes_bp
 from pdf_acta import pdf_bp
 import secciones
@@ -35,6 +36,9 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # tope de toda la petición (US-012: adjuntos)
+    # US-020: Flask corta en 500 KB los formularios normales; el aporte (2 campos de
+    # 50.000 caracteres) puede pesar hasta 1,2 MB al enviarse. Cálculo en aporte_texto.py.
+    MAX_FORM_MEMORY_SIZE=aporte_texto.MAX_BYTES_FORMULARIO,
     # SESSION_COOKIE_SECURE=True,  # actívalo cuando uses HTTPS en producción
 )
 app.register_blueprint(actas_bp)
@@ -115,14 +119,23 @@ def logout():
 # Agenda y objetivos del acta (solo el líder del acta)
 # ---------------------------------------------------------------------------
 def _acta_propia_o_404(acta_id):
-    if not acta_del_lider(acta_id, session["usuario_id"]):
+    acta = acta_del_lider(acta_id, session["usuario_id"])
+    if not acta:
         abort(404)  # no revela si el acta existe pero es de otro líder
+    return acta
+
+
+def _acta_cerrada(acta_id):
+    """US-013: con el acta cerrada no se edita nada; se vuelve al acta con el aviso."""
+    flash(str(ActaCerrada()), "error")
+    return redirect(url_for("actas.ver", acta_id=acta_id))
 
 
 @app.route("/actas/<int:acta_id>/agenda-objetivos")
 @login_requerido
 def agenda_objetivos(acta_id):
-    _acta_propia_o_404(acta_id)
+    if _acta_propia_o_404(acta_id)["estado"] == "cerrada":
+        return _acta_cerrada(acta_id)
     return render_template(
         "agenda_objetivos.html",
         nombre=session["nombre"], rol=session["rol"],
@@ -139,6 +152,8 @@ def agregar_item_acta(acta_id):
         abort(400)
     try:
         agregar_item(acta_id, tipo, request.form.get("descripcion", ""))
+    except (ActaCerrada, psycopg2.errors.ObjectNotInPrerequisiteState):
+        return _acta_cerrada(acta_id)  # 55000: lo rechazó el trigger de US-013
     except ValueError as error:
         flash(str(error))
     except psycopg2.Error as error:
@@ -154,6 +169,8 @@ def eliminar_item_acta(acta_id, item_id):
     try:
         if not eliminar_item(acta_id, item_id):
             flash("Ese ítem ya no existe.")
+    except (ActaCerrada, psycopg2.errors.ObjectNotInPrerequisiteState):
+        return _acta_cerrada(acta_id)  # 55000: lo rechazó el trigger de US-013
     except psycopg2.Error as error:
         app.logger.error("Error de base de datos: %s", error)
         flash("No pudimos quitar el ítem. Intenta de nuevo.")

@@ -4,10 +4,13 @@
 {% block titulo %}{{ acta.numero_acta }} | Actas SENA{% endblock %}
 
 {% block contenido %}
-{% for mensaje in get_flashed_messages(category_filter=['ok']) %}
+{# Los avisos del aporte van dentro de "Mi aporte" y los del cierre en "Cierre del acta";
+   aquí solo si ese panel no se muestra #}
+{% for mensaje in get_flashed_messages(category_filter=['ok'] if puede_aportar else ['ok', 'aporte_ok']) %}
   <div class="aviso-ok" role="status">{{ mensaje }}</div>
 {% endfor %}
-{% for mensaje in get_flashed_messages(category_filter=['error']) %}
+{% set errores_arriba = ['error'] + ([] if puede_aportar else ['aporte_error']) + ([] if panel_cierre else ['cierre_error']) %}
+{% for mensaje in get_flashed_messages(category_filter=errores_arriba) %}
   <div class="alerta" role="alert">{{ mensaje }}</div>
 {% endfor %}
 
@@ -17,9 +20,13 @@
     <p class="sub">{{ acta.nombre_reunion }}</p>
   </div>
   <div class="acciones">
-    <a class="btn-primario btn-enlace" href="{{ url_for('pdf_acta.descargar_pdf', acta_id=acta.id) }}">Descargar PDF</a>
+    {% if acta.estado == 'cerrada' %}
+    <a class="btn-primario btn-pdf" href="{{ url_for('pdf_acta.descargar_pdf', acta_id=acta.id) }}">{{ icono('download') }} Descargar PDF</a>
+    {% else %}
+    <a class="btn-sec" href="{{ url_for('pdf_acta.descargar_pdf', acta_id=acta.id) }}" title="El PDF oficial se genera al cerrar el acta">{{ icono('download') }} Borrador PDF</a>
     {% if acta.lider_id == session.usuario_id %}
     <a class="btn-sec" href="{{ url_for('agenda_objetivos', acta_id=acta.id) }}">Editar agenda y objetivos</a>
+    {% endif %}
     {% endif %}
   </div>
 </div>
@@ -27,8 +34,14 @@
 <div class="tarjeta-estado {{ 'verde' if acta.estado == 'abierta' else 'azul' }}">
   <span class="estado-icono">{{ icono('check-circle' if acta.estado == 'abierta' else 'lock') }}</span>
   <div>
+    {% if acta.estado == 'cerrada' and acta.cerrado_local %}
+    {# US-013: fecha exacta del cierre, en hora de Colombia #}
+    <strong>Cerrada el {{ acta.cerrado_local.strftime('%d/%m/%Y') }} a las {{ acta.cerrado_local.strftime('%H:%M:%S') }} por {{ acta.cerrado_por_nombre }}</strong>
+    <small>El acta ya no admite cambios. Su PDF con el formato {{ acta.codigo_formato or 'vigente' }} está listo para descargar.</small>
+    {% else %}
     <strong>{{ acta.estado|capitalize }}</strong>
     <small>{{ 'Los participantes pueden registrar su aporte.' if acta.estado == 'abierta' else 'El acta ya no admite cambios.' }}</small>
+    {% endif %}
   </div>
 </div>
 
@@ -72,35 +85,156 @@
           <td class="fuerte">{{ p.nombre }} {{ p.apellido }}{% if p.es_creador %} <small>(creador)</small>{% endif %}</td>
           <td>{{ p.rol }}</td>
           <td><span class="insignia {{ 'verde' if p.aporto else 'amarillo' }}">{{ 'Registrado' if p.aporto else 'Pendiente' }}</span></td>
-          <td>{% if p.tiene_firma %}<img class="firma-img" src="{{ url_for('aportes.ver_firma', acta_id=acta.id, usuario_id=p.uid) }}" alt="Firma de {{ p.nombre }} {{ p.apellido }}">{% else %}<small>Sin firma</small>{% endif %}</td>
+          <td class="celda-firma">{% if p.firmado_en %}{% if p.tiene_firma %}<img class="firma-img" src="{{ url_for('aportes.ver_firma', acta_id=acta.id, usuario_id=p.uid) }}" alt="Firma de {{ p.nombre }} {{ p.apellido }}">{% endif %}<span class="insignia verde">Firmado {{ p.firmado_en.strftime('%d/%m/%Y %H:%M') }}</span>{% else %}<span class="insignia amarillo">Pendiente</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="nota-numero">El acta está abierta: cada participante, incluido quien la creó, registrará aquí su aporte (desarrollo, conclusiones, compromisos, firma y anexos).</p>
-</section>
-
-{% if es_participante %}
-<section class="panel" id="aporte">
-  <header class="panel-cab"><h2>Mi aporte</h2></header>
   {% if acta.estado == 'abierta' %}
-  <form class="acta-form" method="post" action="{{ url_for('aportes.guardar_aporte', acta_id=acta.id) }}">
-    <div class="campo completo">
-      <label for="desarrollo">Desarrollo</label>
-      <textarea id="desarrollo" name="desarrollo" rows="5" maxlength="5000">{{ mi_aporte.desarrollo or '' }}</textarea>
-    </div>
-    <div class="campo completo">
-      <label for="conclusiones">Conclusiones</label>
-      <textarea id="conclusiones" name="conclusiones" rows="4" maxlength="5000">{{ mi_aporte.conclusiones or '' }}</textarea>
-    </div>
-    <div class="acciones acciones-form"><button type="submit" class="btn-primario">Guardar mi aporte</button></div>
-  </form>
+  <p class="nota-numero">El acta está abierta: cada participante, incluido quien la creó, registra su desarrollo y sus conclusiones{% if puede_aportar %} en <a href="#mi-aporte">Mi aporte</a>{% endif %}. Los aportes se leen completos en «Aportes de los participantes».</p>
   {% else %}
-  <p class="nota-numero">El acta ya no está abierta.</p>
+  <p class="nota-numero">El acta está cerrada: los aportes quedan en solo lectura.</p>
   {% endif %}
 </section>
 
+{% if panel_cierre %}
+{# US-013: solo el líder, con el acta abierta. El servidor vuelve a revisar todo al cerrar. #}
+{% set total = participantes|length %}
+<section class="panel panel-cierre" id="cierre">
+  <header class="panel-cab envuelve">
+    <h2><span class="icono-titulo">{{ icono('lock') }}</span> Cierre del acta</h2>
+    <small>{{ firmados }} de {{ total }} participantes firmaron</small>
+  </header>
+  {% for mensaje in get_flashed_messages(category_filter=['cierre_error']) %}
+  <div class="alerta" role="alert">{{ mensaje }}</div>
+  {% endfor %}
+  <progress class="progreso-cierre" max="{{ total or 1 }}" value="{{ firmados }}"
+            aria-label="{{ firmados }} de {{ total }} participantes firmaron"></progress>
+  {% if faltantes %}
+  <p class="cierre-texto">Para cerrar el acta, cada participante registra su aporte y lo firma. Falta:</p>
+  <ul class="faltantes">
+    {% for f in faltantes %}
+    <li><span class="fuerte">{{ f.nombre }}</span> <span class="insignia amarillo">Falta {{ f.falta }}</span></li>
+    {% endfor %}
+  </ul>
+  {% elif total %}
+  <p class="cierre-texto listo">{{ icono('check-circle') }} Todos aportaron y firmaron: ya puedes cerrar el acta.</p>
+  {% else %}
+  <p class="cierre-texto">El acta no tiene participantes que la aprueben.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('actas.cerrar', acta_id=acta.id) }}"
+        data-confirmar="¿Cerrar el acta y generar el PDF?"
+        data-detalle="Ya no se podrá editar: aportes, firmas, agenda, objetivos y adjuntos quedan en solo lectura. Se guarda la fecha y hora exactas del cierre y se genera el PDF con el formato {{ acta.codigo_formato or 'vigente' }}.">
+    <button type="submit" class="btn-primario"{% if faltantes or not total %} disabled aria-describedby="cierre-ayuda"{% endif %}>Cerrar acta y generar PDF</button>
+  </form>
+  {% if faltantes or not total %}
+  <p class="ayuda" id="cierre-ayuda">El botón se habilita cuando todos los participantes hayan registrado y firmado su aporte.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if puede_aportar %}
+<section class="panel" id="mi-aporte">
+  <header class="panel-cab envuelve">
+    <h2><span class="icono-titulo">{{ icono('user') }}</span> Mi aporte</h2>
+    {% if aporte_guardado_en %}<small>Guardado por última vez el {{ aporte_guardado_en.strftime('%d/%m/%Y a las %H:%M') }}</small>{% endif %}
+  </header>
+  {% for mensaje in get_flashed_messages(category_filter=['aporte_ok']) %}
+  <div class="aviso-ok" role="status">{{ mensaje }}</div>
+  {% endfor %}
+  {% for mensaje in get_flashed_messages(category_filter=['aporte_error']) %}
+  <div class="alerta" role="alert">{{ mensaje }}</div>
+  {% endfor %}
+  {% if errores_aporte %}
+  <div class="alerta alerta-lista" role="alert" id="errores-aporte" tabindex="-1">
+    <strong>No se guardó tu aporte. Tu texto sigue en el formulario.</strong>
+    <ul>{% for e in errores_aporte %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% set sin_texto = errores_aporte and not aporte.desarrollo and not aporte.conclusiones %}
+  {# Si vuelve con errores (400/503) el ancla lleva el foco a la caja; al guardar, la redirección va a #mi-aporte #}
+  <form class="form-aporte" method="post" id="form-aporte"
+        action="{{ url_for('aportes.guardar_aporte', acta_id=acta.id) }}#errores-aporte">
+    {% for campo, etiqueta, ayuda in [
+         ('desarrollo', 'Desarrollo de la reunión', 'Relata lo que se trató en la reunión, punto por punto.'),
+         ('conclusiones', 'Conclusiones', 'Acuerdos y conclusiones a las que se llegó.')] %}
+    {% set largo = (aporte[campo] or '')|length %}
+    <div class="campo">
+      <label for="aporte-{{ campo }}">{{ etiqueta }}</label>
+      <textarea id="aporte-{{ campo }}" name="{{ campo }}" rows="12" maxlength="{{ max_aporte }}"
+                aria-describedby="{{ 'errores-aporte ' if errores_aporte }}ayuda-{{ campo }} contador-{{ campo }}"
+                data-contador="contador-{{ campo }}" data-recorte="recorte-{{ campo }}"{% if sin_texto or largo > max_aporte %} aria-invalid="true"{% endif %}>
+{{ aporte[campo] or '' }}</textarea>
+      <div class="campo-pie">
+        <span class="ayuda" id="ayuda-{{ campo }}">{{ ayuda }} Máximo {{ max_aporte|miles }} caracteres (unas 15 páginas).</span>
+        <span class="ayuda contador-aporte{{ ' excedido' if largo > max_aporte }}" id="contador-{{ campo }}"
+              aria-live="polite">{{ largo|miles }} / {{ max_aporte|miles }} caracteres</span>
+      </div>
+      <p class="alerta aviso-recorte" id="recorte-{{ campo }}" role="alert" hidden></p>
+    </div>
+    {% endfor %}
+    <p class="ayuda">Llena uno de los dos campos o ambos. Puedes corregir tu aporte mientras el acta esté abierta.</p>
+    <button type="submit" class="btn-primario">Guardar mi aporte</button>
+  </form>
+
+  {# US-013: la firma es del aporte guardado; si después cambia, hay que volver a firmar #}
+  <div class="firma-aporte{{ ' firmada' if mi_firma }}" id="firma">
+    <span class="estado-icono">{{ icono('check-circle' if mi_firma else 'clock') }}</span>
+    <div class="firma-texto">
+      {% if mi_firma %}
+      <strong>Firmaste tu aporte el {{ mi_firma.strftime('%d/%m/%Y') }} a las {{ mi_firma.strftime('%H:%M') }}.</strong>
+      <small>Con tu firma apruebas el acta. Si cambias tu aporte, la firma se anula y tendrás que volver a firmarlo.</small>
+      {% elif mi_aporto %}
+      <strong>Falta tu firma.</strong>
+      <small>Cuando tu aporte esté completo, fírmalo: firmar es aprobar el acta. El líder solo puede cerrarla cuando todos firmaron.</small>
+      {% else %}
+      <strong>Falta tu aporte y tu firma.</strong>
+      <small id="firma-ayuda">Guarda tu aporte para poder firmarlo.</small>
+      {% endif %}
+    </div>
+    {% if not mi_firma %}
+    <form method="post" action="{{ url_for('actas.firmar', acta_id=acta.id) }}"
+          data-confirmar="¿Firmar tu aporte?"
+          data-detalle="Firmar es aprobar el acta con el aporte que tienes guardado. Si después lo cambias, la firma se anula y tendrás que firmarlo de nuevo.">
+      <button type="submit" class="btn-sec"{% if not mi_aporto %} disabled aria-describedby="firma-ayuda"{% endif %}>Firmar mi aporte</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% set con_aporte = participantes|selectattr('aporto')|list %}
+<section class="panel" id="aportes">
+  <header class="panel-cab envuelve">
+    <h2><span class="icono-titulo">{{ icono('file-text') }}</span> Aportes de los participantes</h2>
+    <small>{{ con_aporte|length }} de {{ participantes|length }} con aporte</small>
+  </header>
+  {% for p in con_aporte %}
+  <article class="aporte">
+    <header class="aporte-cab">
+      <h3>{{ p.nombre }} {{ p.apellido }}{% if p.es_creador %} <small>(creador)</small>{% endif %}</h3>
+      <span>{{ p.rol }}{% if p.aporte_actualizado_en %} · {{ p.aporte_actualizado_en.strftime('%d/%m/%Y %H:%M') }}{% endif %}</span>
+    </header>
+    {% if p.desarrollo %}
+    <h4>Desarrollo de la reunión</h4>
+    <div class="aporte-texto">{{ p.desarrollo }}</div>
+    {% endif %}
+    {% if p.conclusiones %}
+    <h4>Conclusiones</h4>
+    <div class="aporte-texto">{{ p.conclusiones }}</div>
+    {% endif %}
+  </article>
+  {% else %}
+  <div class="vacio-ilustrado vacio-aportes">
+    <span class="vacio-icono">{{ icono('file-text') }}</span>
+    <p class="fuerte">Todavía nadie ha registrado su aporte.</p>
+    <p class="sub">{{ 'Aquí aparecerán completos el desarrollo y las conclusiones de cada participante.' if acta.estado == 'abierta' else 'El acta se cerró sin aportes registrados.' }}</p>
+  </div>
+  {% endfor %}
+</section>
+
+{% if es_participante %}
 <section class="panel" id="firma">
   <header class="panel-cab"><h2>Mi firma</h2></header>
   {% if tengo_firma %}
@@ -252,6 +386,73 @@
     });
   })();
 </script>
+{% if puede_aportar %}
+<script>
+  // Mi aporte (US-020): contador de caracteres y aviso al salir sin guardar.
+  // El servidor vuelve a validar todo.
+  (function () {
+    var form = document.getElementById('form-aporte');
+    var campos = form.querySelectorAll('textarea');
+    var maximo = {{ max_aporte }};
+    var sinGuardar = {{ 'true' if errores_aporte else 'false' }};  // volvió con errores: nada se guardó
+    var enviando = false;
+    function miles(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+    // Cuenta igual que el servidor: el salto de línea vale 1 y no cuentan los espacios ni los
+    // invisibles (BOM, ancho cero) de los extremos. \x1c-\x1f y \x85 son espacios en Python, no en \s.
+    var extremo = /^[\s\x1c-\x1f\x85\u200b-\u200d\u2060]$/;
+    function contar(t) {
+      var c = Array.from(t.replace(/\r\n?/g, '\n')), i = 0, j = c.length;
+      while (i < j && extremo.test(c[i])) i++;
+      while (j > i && extremo.test(c[j - 1])) j--;
+      return j - i;
+    }
+    function puntos(t) { return Array.from(t).length; }  // un emoji vale 1, como en el servidor
+    Array.prototype.forEach.call(campos, function (campo) {
+      var contador = document.getElementById(campo.dataset.contador);
+      var recorte = document.getElementById(campo.dataset.recorte);
+      function actualizar() {
+        var n = contar(campo.value);
+        var lleno = puntos(campo.value) >= maximo;  // ya no deja escribir más
+        // maxlength cuenta en UTF-16 (un emoji vale 2): se le suma lo que ocupan
+        // de más los emoji para que quepan justo `maximo` caracteres
+        campo.maxLength = maximo + campo.value.length - puntos(campo.value);
+        contador.textContent = miles(n) + ' / ' + miles(maximo) + ' caracteres' +
+          (lleno && n <= maximo ? ' · límite alcanzado' : '');
+        contador.classList.toggle('excedido', lleno);
+        if (!lleno) recorte.hidden = true;
+      }
+      // Si lo pegado no cabe, el navegador lo recorta: se deja entrar justo lo que cabe y se avisa
+      campo.addEventListener('paste', function (e) {
+        var pegado = (e.clipboardData ? e.clipboardData.getData('text/plain') : '').replace(/\r\n?/g, '\n');
+        if (!pegado) return;  // sin texto plano: el navegador decide, el servidor valida
+        var resto = campo.value.slice(0, campo.selectionStart) + campo.value.slice(campo.selectionEnd);
+        var libres = Math.max(0, maximo - puntos(resto));
+        var cabe = Array.from(pegado).slice(0, libres).join('');
+        campo.maxLength = resto.length + cabe.length;
+        var total = puntos(pegado);
+        if (total > libres) {
+          recorte.textContent = libres
+            ? 'Pegaste ' + miles(total) + ' caracteres y solo cupieron ' + miles(libres) +
+              ': el resto no se agregó. Revisa el final de lo que pegaste.'
+            : 'No se pegó nada: el campo ya tiene el máximo de ' + miles(maximo) + ' caracteres.';
+          recorte.hidden = false;
+        }
+        setTimeout(actualizar, 0);  // devuelve el maxlength normal aunque no se haya pegado nada
+      });
+      campo.addEventListener('input', actualizar);
+      actualizar();
+    });
+    form.addEventListener('submit', function () { enviando = true; });
+    window.addEventListener('beforeunload', function (e) {
+      if (enviando) return;
+      var cambios = sinGuardar || Array.prototype.some.call(campos, function (c) { return c.value !== c.defaultValue; });
+      if (cambios) { e.preventDefault(); e.returnValue = ''; }
+    });
+    var errores = document.getElementById('errores-aporte');
+    if (errores) errores.focus();
+  })();
+</script>
+{% endif %}
 {% if puede_adjuntar %}
 <script>
   // Aviso inmediato; el servidor vuelve a validar todo.
