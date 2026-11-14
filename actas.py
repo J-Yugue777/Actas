@@ -485,7 +485,6 @@ def ver(acta_id):
     return _mostrar_acta(acta_id, session["usuario_id"])
 
 
-# ------------------------------------------- US-020 · aporte del participante
 # ------------------------------------------------------- US-012 · adjuntos
 def _acceso(cur, acta_id, usuario_id):
     """Datos de acceso del usuario al acta. 404 si no existe, 403 si no participa."""
