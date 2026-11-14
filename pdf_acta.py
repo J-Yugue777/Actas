@@ -128,6 +128,12 @@ def _tamano(n):
     return f"{math.ceil(n / 1024)} KB"
 
 
+def nombre_regional(nombre):
+    """'Valle' -> 'Regional Valle'; si el catálogo ya trae el prefijo, no lo repite."""
+    nombre = " ".join((nombre or "").split())
+    return nombre if nombre.lower().startswith("regional ") else f"Regional {nombre}"
+
+
 def nombre_descarga(numero_acta, nombre_reunion):
     """Nombre legible del PDF al descargarlo: 'Acta 1 - Reunión de equipo.pdf'.
 
@@ -195,7 +201,7 @@ def _tabla_datos(d, est):
         [et("Hora de inicio"), val(d["hora_inicio"]), et("Hora de fin"), val(d["hora_fin"])],
         [et("Lugar y/o enlace"), val(d["lugar_enlace"]), "", ""],
         [et("Dirección regional / centro de formación"),
-         val(f"Regional {d['regional']} / {d['centro']}"), "", ""],
+         val(f"{nombre_regional(d['regional'])} / {d['centro']}"), "", ""],
     ]
     if d.get("ficha"):
         filas += [

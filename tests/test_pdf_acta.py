@@ -206,5 +206,20 @@ class NombreDescargaTest(unittest.TestCase):
         self.assertEqual(nombre_descarga("", "   "), "Acta.pdf")
 
 
+class NombreRegionalTest(unittest.TestCase):
+    def test_agrega_el_prefijo(self):
+        self.assertEqual(pdf_acta.nombre_regional("Valle"), "Regional Valle")
+
+    def test_no_repite_el_prefijo_del_catalogo(self):
+        # La migración de US-005 puede guardar las regionales como "Regional Arauca"
+        self.assertEqual(pdf_acta.nombre_regional("Regional Arauca"), "Regional Arauca")
+        self.assertEqual(pdf_acta.nombre_regional("REGIONAL  Arauca"), "REGIONAL Arauca")
+
+    def test_en_el_pdf_sale_una_sola_vez(self):
+        texto = contenido(generar_pdf_acta(datos_base(regional="Regional Valle")))
+        self.assertIn(b"Regional Valle", texto)
+        self.assertNotIn(b"Regional Regional", texto)
+
+
 if __name__ == "__main__":
     unittest.main()
