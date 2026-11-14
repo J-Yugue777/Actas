@@ -4,11 +4,13 @@
 {% block titulo %}{{ acta.numero_acta }} | Actas SENA{% endblock %}
 
 {% block contenido %}
-{# Los avisos del aporte van dentro de "Mi aporte"; aquí solo si ese panel no se muestra #}
+{# Los avisos del aporte van dentro de "Mi aporte" y los del cierre en "Cierre del acta";
+   aquí solo si ese panel no se muestra #}
 {% for mensaje in get_flashed_messages(category_filter=['ok'] if puede_aportar else ['ok', 'aporte_ok']) %}
   <div class="aviso-ok" role="status">{{ mensaje }}</div>
 {% endfor %}
-{% for mensaje in get_flashed_messages(category_filter=['error'] if puede_aportar else ['error', 'aporte_error']) %}
+{% set errores_arriba = ['error'] + ([] if puede_aportar else ['aporte_error']) + ([] if panel_cierre else ['cierre_error']) %}
+{% for mensaje in get_flashed_messages(category_filter=errores_arriba) %}
   <div class="alerta" role="alert">{{ mensaje }}</div>
 {% endfor %}
 
@@ -18,7 +20,9 @@
     <p class="sub">{{ acta.nombre_reunion }}</p>
   </div>
   <div class="acciones">
-    {% if acta.lider_id == session.usuario_id %}
+    {% if acta.estado == 'cerrada' %}
+    <a class="btn-primario btn-pdf" href="{{ url_for('actas.descargar_pdf', acta_id=acta.id) }}">{{ icono('download') }} Descargar PDF</a>
+    {% elif acta.lider_id == session.usuario_id %}
     <a class="btn-sec" href="{{ url_for('agenda_objetivos', acta_id=acta.id) }}">Editar agenda y objetivos</a>
     {% endif %}
   </div>
@@ -27,8 +31,14 @@
 <div class="tarjeta-estado {{ 'verde' if acta.estado == 'abierta' else 'azul' }}">
   <span class="estado-icono">{{ icono('check-circle' if acta.estado == 'abierta' else 'lock') }}</span>
   <div>
+    {% if acta.estado == 'cerrada' and acta.cerrado_local %}
+    {# US-013: fecha exacta del cierre, en hora de Colombia #}
+    <strong>Cerrada el {{ acta.cerrado_local.strftime('%d/%m/%Y') }} a las {{ acta.cerrado_local.strftime('%H:%M:%S') }} por {{ acta.cerrado_por_nombre }}</strong>
+    <small>El acta ya no admite cambios. Su PDF con el formato {{ acta.codigo_formato or 'vigente' }} está listo para descargar.</small>
+    {% else %}
     <strong>{{ acta.estado|capitalize }}</strong>
     <small>{{ 'Los participantes pueden registrar su aporte.' if acta.estado == 'abierta' else 'El acta ya no admite cambios.' }}</small>
+    {% endif %}
   </div>
 </div>
 
@@ -84,6 +94,42 @@
   <p class="nota-numero">El acta está cerrada: los aportes quedan en solo lectura.</p>
   {% endif %}
 </section>
+
+{% if panel_cierre %}
+{# US-013: solo el líder, con el acta abierta. El servidor vuelve a revisar todo al cerrar. #}
+{% set total = participantes|length %}
+<section class="panel panel-cierre" id="cierre">
+  <header class="panel-cab envuelve">
+    <h2><span class="icono-titulo">{{ icono('lock') }}</span> Cierre del acta</h2>
+    <small>{{ firmados }} de {{ total }} participantes firmaron</small>
+  </header>
+  {% for mensaje in get_flashed_messages(category_filter=['cierre_error']) %}
+  <div class="alerta" role="alert">{{ mensaje }}</div>
+  {% endfor %}
+  <progress class="progreso-cierre" max="{{ total or 1 }}" value="{{ firmados }}"
+            aria-label="{{ firmados }} de {{ total }} participantes firmaron"></progress>
+  {% if faltantes %}
+  <p class="cierre-texto">Para cerrar el acta, cada participante registra su aporte y lo firma. Falta:</p>
+  <ul class="faltantes">
+    {% for f in faltantes %}
+    <li><span class="fuerte">{{ f.nombre }}</span> <span class="insignia amarillo">Falta {{ f.falta }}</span></li>
+    {% endfor %}
+  </ul>
+  {% elif total %}
+  <p class="cierre-texto listo">{{ icono('check-circle') }} Todos aportaron y firmaron: ya puedes cerrar el acta.</p>
+  {% else %}
+  <p class="cierre-texto">El acta no tiene participantes que la aprueben.</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('actas.cerrar', acta_id=acta.id) }}"
+        data-confirmar="¿Cerrar el acta y generar el PDF?"
+        data-detalle="Ya no se podrá editar: aportes, firmas, agenda, objetivos y adjuntos quedan en solo lectura. Se guarda la fecha y hora exactas del cierre y se genera el PDF con el formato {{ acta.codigo_formato or 'vigente' }}.">
+    <button type="submit" class="btn-primario"{% if faltantes or not total %} disabled aria-describedby="cierre-ayuda"{% endif %}>Cerrar acta y generar PDF</button>
+  </form>
+  {% if faltantes or not total %}
+  <p class="ayuda" id="cierre-ayuda">El botón se habilita cuando todos los participantes hayan registrado y firmado su aporte.</p>
+  {% endif %}
+</section>
+{% endif %}
 
 {% if puede_aportar %}
 <section class="panel" id="mi-aporte">
