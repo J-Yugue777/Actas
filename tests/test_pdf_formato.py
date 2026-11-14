@@ -1,5 +1,5 @@
 """
-Pruebas de US-013: PDF del acta con el formato GOR-F-084 v2 (pdf_acta.py).
+Pruebas de US-013: PDF del acta con el formato GOR-F-084 v2 (pdf_formato.py).
 
 No necesitan base de datos ni librerías extra. Ejecutar desde la raíz del repositorio:
     python -m unittest discover -s tests -v
@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PIL import Image  # noqa: E402
 
-import pdf_acta  # noqa: E402
-from pdf_acta import generar_pdf_acta, nombre_descarga  # noqa: E402
+import pdf_formato as pdf_acta  # noqa: E402
+from pdf_formato import generar_pdf_acta, nombre_descarga  # noqa: E402
 
 LARGO = 50_000
 PALABRA_LARGA = "Z" * 5_000
@@ -219,6 +219,48 @@ class NombreRegionalTest(unittest.TestCase):
         texto = contenido(generar_pdf_acta(datos_base(regional="Regional Valle")))
         self.assertIn(b"Regional Valle", texto)
         self.assertNotIn(b"Regional Regional", texto)
+
+
+class BorradorYFirmaTest(unittest.TestCase):
+    """US-014: borrador con el acta abierta; firma con imagen («Mi firma») en las tablas."""
+
+    def test_borrador_lleva_la_marca_y_la_hora_en_que_se_genero(self):
+        pdf = generar_pdf_acta(datos_base(borrador=True, generado_en="13/11/2026 09:00:00",
+                                          cerrado_en=None, cerrado_por=None))
+        texto = contenido(pdf)
+        self.assertIn(b"BORRADOR", texto)
+        self.assertIn(b"13/11/2026 09:00:00", texto)
+        self.assertNotIn(b"Cerrada el", texto)
+
+    def test_borrador_muestra_las_firmas_pendientes(self):
+        sin_firmar = [{"nombre": "Iván", "rol": "Instructor", "desarrollo": "x",
+                       "conclusiones": None, "firmado_en": None}]
+        pdf = generar_pdf_acta(datos_base(borrador=True, participantes=sin_firmar))
+        self.assertIn(b"Pendiente de firma", contenido(pdf))
+
+    def test_acta_cerrada_sin_marca_de_borrador(self):
+        self.assertNotIn(b"BORRADOR", contenido(generar_pdf_acta(datos_base())))
+
+    def test_firma_con_imagen_en_asistentes_y_compromisos(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as archivo:
+            archivo.write(imagen("PNG", (400, 120), "RGBA", (10, 20, 120, 255)))
+        try:
+            participante = dict(datos_base()["participantes"][0], firma_ruta=archivo.name)
+            compromiso = {"actividad": "Entregar informe", "fecha": "20/11/2026",
+                          "responsable": "Lina Líder", "firma": "Registrado por Lina Líder",
+                          "firma_ruta": archivo.name}
+            sin = generar_pdf_acta(datos_base())
+            con = generar_pdf_acta(datos_base(participantes=[participante], compromisos=[compromiso]))
+        finally:
+            os.unlink(archivo.name)
+        self.assertGreater(con.count(b"/Subtype /Image"), sin.count(b"/Subtype /Image"))
+        self.assertIn(b"Registrado por Lina L", contenido(con))
+
+    def test_firma_perdida_deja_solo_el_texto(self):
+        participante = dict(datos_base()["participantes"][0], firma_ruta="/no/existe/firma.png")
+        pdf = generar_pdf_acta(datos_base(participantes=[participante]))
+        self.assertIn(b"Firmado electr", contenido(pdf))
 
 
 if __name__ == "__main__":

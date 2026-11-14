@@ -21,9 +21,12 @@
   </div>
   <div class="acciones">
     {% if acta.estado == 'cerrada' %}
-    <a class="btn-primario btn-pdf" href="{{ url_for('actas.descargar_pdf', acta_id=acta.id) }}">{{ icono('download') }} Descargar PDF</a>
-    {% elif acta.lider_id == session.usuario_id %}
+    <a class="btn-primario btn-pdf" href="{{ url_for('pdf_acta.descargar_pdf', acta_id=acta.id) }}">{{ icono('download') }} Descargar PDF</a>
+    {% else %}
+    <a class="btn-sec" href="{{ url_for('pdf_acta.descargar_pdf', acta_id=acta.id) }}" title="El PDF oficial se genera al cerrar el acta">{{ icono('download') }} Borrador PDF</a>
+    {% if acta.lider_id == session.usuario_id %}
     <a class="btn-sec" href="{{ url_for('agenda_objetivos', acta_id=acta.id) }}">Editar agenda y objetivos</a>
+    {% endif %}
     {% endif %}
   </div>
 </div>
@@ -82,7 +85,7 @@
           <td class="fuerte">{{ p.nombre }} {{ p.apellido }}{% if p.es_creador %} <small>(creador)</small>{% endif %}</td>
           <td>{{ p.rol }}</td>
           <td><span class="insignia {{ 'verde' if p.aporto else 'amarillo' }}">{{ 'Registrado' if p.aporto else 'Pendiente' }}</span></td>
-          <td>{% if p.firmado_en %}<span class="insignia verde">Firmado {{ p.firmado_en.strftime('%d/%m/%Y %H:%M') }}</span>{% else %}<span class="insignia amarillo">Pendiente</span>{% endif %}</td>
+          <td class="celda-firma">{% if p.firmado_en %}{% if p.tiene_firma %}<img class="firma-img" src="{{ url_for('aportes.ver_firma', acta_id=acta.id, usuario_id=p.uid) }}" alt="Firma de {{ p.nombre }} {{ p.apellido }}">{% endif %}<span class="insignia verde">Firmado {{ p.firmado_en.strftime('%d/%m/%Y %H:%M') }}</span>{% else %}<span class="insignia amarillo">Pendiente</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -152,7 +155,7 @@
   {% set sin_texto = errores_aporte and not aporte.desarrollo and not aporte.conclusiones %}
   {# Si vuelve con errores (400/503) el ancla lleva el foco a la caja; al guardar, la redirección va a #mi-aporte #}
   <form class="form-aporte" method="post" id="form-aporte"
-        action="{{ url_for('actas.guardar_aporte', acta_id=acta.id) }}#errores-aporte">
+        action="{{ url_for('aportes.guardar_aporte', acta_id=acta.id) }}#errores-aporte">
     {% for campo, etiqueta, ayuda in [
          ('desarrollo', 'Desarrollo de la reunión', 'Relata lo que se trató en la reunión, punto por punto.'),
          ('conclusiones', 'Conclusiones', 'Acuerdos y conclusiones a las que se llegó.')] %}
@@ -229,6 +232,78 @@
     <p class="sub">{{ 'Aquí aparecerán completos el desarrollo y las conclusiones de cada participante.' if acta.estado == 'abierta' else 'El acta se cerró sin aportes registrados.' }}</p>
   </div>
   {% endfor %}
+</section>
+
+{% if es_participante %}
+<section class="panel" id="firma">
+  <header class="panel-cab"><h2>Mi firma</h2></header>
+  {% if tengo_firma %}
+  <img class="firma-img firma-grande" src="{{ url_for('aportes.ver_firma', acta_id=acta.id, usuario_id=session.usuario_id) }}" alt="Mi firma">
+  {% else %}
+  <p class="nota-numero">Aún no has subido tu firma.</p>
+  {% endif %}
+  <form class="adjuntar" method="post" enctype="multipart/form-data" action="{{ url_for('aportes.subir_firma') }}">
+    <div class="campo">
+      <label for="firma_archivo">{{ 'Reemplazar mi firma' if tengo_firma else 'Subir mi firma' }}</label>
+      <input id="firma_archivo" name="firma" type="file" accept=".png,.jpg,.jpeg" required>
+      <span class="ayuda">Imagen JPG o PNG, máximo 2 MB. Se usa en tus compromisos y en la tabla de asistentes.</span>
+    </div>
+    <button type="submit" class="btn-primario">Guardar firma</button>
+  </form>
+</section>
+{% endif %}
+
+<section class="panel" id="compromisos">
+  <header class="panel-cab"><h2>Compromisos <small>({{ compromisos|length }})</small></h2></header>
+  {% if compromisos %}
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>Actividad</th><th>Fecha</th><th>Responsable</th><th>Firma</th><th></th></tr></thead>
+      <tbody>
+        {% for c in compromisos %}
+        <tr>
+          <td class="fuerte">{{ c.actividad }}</td>
+          <td>{{ c.fecha_entrega.strftime('%d/%m/%Y') }}</td>
+          <td>{{ c.responsable or 'Sin asignar' }}</td>
+          <td>{% if c.tiene_firma and c.creado_por %}<img class="firma-img" src="{{ url_for('aportes.ver_firma', acta_id=acta.id, usuario_id=c.creado_por) }}" alt="Firma">{% else %}<small>Sin firma</small>{% endif %}</td>
+          <td>
+            {% if acta.estado == 'abierta' and (c.creado_por == session.usuario_id or es_lider) %}
+            <form method="post" action="{{ url_for('aportes.eliminar_compromiso', acta_id=acta.id, compromiso_id=c.id) }}"
+                  data-confirmar="¿Quitar este compromiso?" data-detalle="{{ c.actividad }}">
+              <button type="submit" class="quitar" aria-label="Quitar compromiso">×</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="nota-numero">Aún no hay compromisos.</p>
+  {% endif %}
+
+  {% if es_participante and acta.estado == 'abierta' %}
+  <form class="adjuntar" method="post" action="{{ url_for('aportes.agregar_compromiso', acta_id=acta.id) }}">
+    <div class="campo">
+      <label for="actividad">Actividad</label>
+      <input type="text" id="actividad" name="actividad" maxlength="300" required>
+    </div>
+    <div class="campo">
+      <label for="fecha_entrega">Fecha de entrega</label>
+      <input type="date" id="fecha_entrega" name="fecha_entrega" required>
+    </div>
+    <div class="campo">
+      <label for="responsable_id">Responsable</label>
+      <select id="responsable_id" name="responsable_id" required>
+        <option value="">Selecciona…</option>
+        {% for p in participantes %}<option value="{{ p.uid }}">{{ p.nombre }} {{ p.apellido }}</option>{% endfor %}
+      </select>
+    </div>
+    <span class="ayuda">{{ 'Tu firma acompañará este compromiso.' if tengo_firma else 'Sube tu firma (arriba) para que acompañe tus compromisos.' }}</span>
+    <button type="submit" class="btn-primario">Agregar compromiso</button>
+  </form>
+  {% endif %}
 </section>
 
 <section class="panel" id="adjuntos">

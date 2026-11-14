@@ -12,7 +12,6 @@ Reglas de permiso:
 - Solo una acta de equipo ejecutor por ficha y mes.
 """
 import hashlib
-import io
 import os
 import re
 import sys
@@ -23,16 +22,16 @@ from functools import wraps
 
 import psycopg2
 from flask import (Blueprint, abort, current_app, flash, redirect, render_template,
-                   request, send_file, send_from_directory, session, url_for)
+                   request, send_from_directory, session, url_for)
 from werkzeug.exceptions import HTTPException
 
 import adjuntos as adj
-import aportes
-import pdf_acta
+import aporte_texto
+import pdf_formato
 from db import get_connection
 
 actas_bp = Blueprint("actas", __name__, url_prefix="/actas")
-actas_bp.add_app_template_filter(aportes.miles, "miles")  # {{ 50000|miles }} -> 50.000
+actas_bp.add_app_template_filter(aporte_texto.miles, "miles")  # {{ 50000|miles }} -> 50.000
 
 ROL_LIDER = "Instructor líder de ficha"
 ROLES_TODAS_LAS_FICHAS = ("Administrador", "Coordinador académico")
@@ -390,7 +389,8 @@ def listar_participantes(cur, acta_id, lider_id):
                (p.desarrollo IS NOT NULL OR p.conclusiones IS NOT NULL) AS aporto,
                p.desarrollo, p.conclusiones,
                p.aporte_actualizado_en AT TIME ZONE 'America/Bogota' AS aporte_actualizado_en,
-               p.firmado_en AT TIME ZONE 'America/Bogota' AS firmado_en
+               p.firmado_en AT TIME ZONE 'America/Bogota' AS firmado_en,
+               u.id AS uid, (u.firma_archivo IS NOT NULL) AS tiene_firma, u.firma_archivo
         FROM acta_participantes p
         JOIN usuarios u ON u.id = p.usuario_id
         JOIN roles r ON r.id = u.rol_id
@@ -463,6 +463,23 @@ def contexto_ver(cur, acta_id, usuario_id):
     )
     puntos = cur.fetchall()
     participantes = listar_participantes(cur, acta_id, acta["lider_id"])
+    cur.execute(
+        """
+        SELECT c.id, c.actividad, c.fecha_entrega, c.completado, c.creado_por,
+               c.responsable_id,
+               COALESCE(ur.nombre || ' ' || ur.apellido, c.responsable_texto) AS responsable,
+               (uc.firma_archivo IS NOT NULL) AS tiene_firma
+        FROM acta_compromisos c
+        LEFT JOIN usuarios ur ON ur.id = c.responsable_id
+        LEFT JOIN usuarios uc ON uc.id = c.creado_por
+        WHERE c.acta_id = %s
+        ORDER BY c.fecha_entrega, c.id
+        """,
+        (acta_id,),
+    )
+    compromisos = cur.fetchall()
+    cur.execute("SELECT (firma_archivo IS NOT NULL) AS tiene FROM usuarios WHERE id = %s", (usuario_id,))
+    tengo_firma = cur.fetchone()["tiene"]
     lista_adjuntos = adj.listar_adjuntos(cur, acta_id)
     puede_adjuntar = acta["estado"] == "abierta" and (
         es_participante or acta["lider_id"] == usuario_id)
@@ -470,6 +487,8 @@ def contexto_ver(cur, acta_id, usuario_id):
 
     return dict(
         acta=acta, meses=MESES, participantes=participantes,
+        compromisos=compromisos, tengo_firma=tengo_firma,
+        es_participante=es_participante, es_lider=acta["lider_id"] == usuario_id,
         adjuntos=lista_adjuntos, puede_adjuntar=puede_adjuntar,
         puede_gestionar_adjuntos=acta["estado"] == "abierta",
         max_mb=adj.MAX_BYTES // (1024 * 1024), max_bytes=adj.MAX_BYTES,
@@ -479,9 +498,9 @@ def contexto_ver(cur, acta_id, usuario_id):
         objetivos=[p["descripcion"] for p in puntos if p["tipo"] == "objetivo"],
         # US-020: el formulario "Mi aporte" solo es para participantes con el acta abierta
         puede_aportar=acta["estado"] == "abierta" and es_participante,
-        aporte={c: mio[c] if mio else None for c in aportes.CAMPOS},
+        aporte={c: mio[c] if mio else None for c in aporte_texto.CAMPOS},
         aporte_guardado_en=mio["aporte_actualizado_en"] if mio else None,
-        errores_aporte=[], max_aporte=aportes.MAX_LARGO_APORTE,
+        errores_aporte=[], max_aporte=aporte_texto.MAX_LARGO_APORTE,
         # US-013: firma del aporte guardado (no del texto que se esté editando) y cierre
         mi_aporto=bool(mio and mio["aporto"]), mi_firma=mio["firmado_en"] if mio else None,
         firmados=sum(1 for p in participantes if p["firmado_en"]),
@@ -505,71 +524,6 @@ def _mostrar_acta(acta_id, usuario_id, estado_http=200, **cambios):
 @login_requerido
 def ver(acta_id):
     return _mostrar_acta(acta_id, session["usuario_id"])
-
-
-# ------------------------------------------- US-020 · aporte del participante
-@actas_bp.route("/<int:acta_id>/aporte", methods=["POST"])
-@login_requerido
-def guardar_aporte(acta_id):
-    """Cada participante registra o corrige su desarrollo y sus conclusiones."""
-    usuario_id = session["usuario_id"]
-    aporte = aportes.leer_aporte(request.form)
-    errores = aportes.validar_aporte(aporte)
-    abierta = guardado = firma_anulada = firma_conservada = False
-    try:
-        with transaccion() as cur:
-            _acceso(cur, acta_id, usuario_id)  # 404 si no existe, 403 si no tiene acceso
-            # Bloquea el acta hasta terminar: nadie la cierra a mitad del guardado
-            cur.execute("SELECT estado FROM actas WHERE id = %s FOR SHARE", (acta_id,))
-            abierta = cur.fetchone()["estado"] == "abierta"
-            # Solo escribe quien tiene fila de participante (el líder también la necesita);
-            # Administrador y Coordinador que no participan solo leen. 403 sea cual sea el texto.
-            cur.execute(
-                "SELECT desarrollo, conclusiones, firmado_en FROM acta_participantes "
-                "WHERE acta_id = %s AND usuario_id = %s FOR UPDATE",
-                (acta_id, usuario_id),
-            )
-            fila = cur.fetchone()
-            if fila is None:
-                abort(403)
-            if abierta and not errores:
-                # US-013: la firma aprueba un texto; si el texto cambia, la firma se anula
-                cambio = (fila["desarrollo"], fila["conclusiones"]) != (
-                    aporte["desarrollo"], aporte["conclusiones"])
-                firma_anulada = cambio and fila["firmado_en"] is not None
-                firma_conservada = not cambio and fila["firmado_en"] is not None
-                if cambio:  # el mismo texto no se reescribe: conserva la hora y la firma
-                    cur.execute(
-                        """
-                        UPDATE acta_participantes
-                        SET desarrollo = %s, conclusiones = %s, aporte_actualizado_en = now(),
-                            firmado_en = NULL
-                        WHERE acta_id = %s AND usuario_id = %s
-                        """,
-                        (aporte["desarrollo"], aporte["conclusiones"], acta_id, usuario_id),
-                    )
-                guardado = True
-    except psycopg2.errors.ObjectNotInPrerequisiteState:
-        abierta = False  # el trigger de US-013 lo rechazó: el acta ya está cerrada
-    except psycopg2.Error:
-        current_app.logger.exception("Error de base de datos al guardar el aporte")
-        errores = ["No pudimos guardar tu aporte. Tu texto sigue aquí: intenta de nuevo."]
-        return _mostrar_acta(acta_id, usuario_id, 503, aporte=aporte, errores_aporte=errores)
-
-    if not abierta:
-        flash("El acta ya no está abierta: no se puede registrar ni cambiar el aporte.", "error")
-        return redirect(url_for("actas.ver", acta_id=acta_id))
-    if guardado:
-        # aporte_ok/aporte_error se pintan dentro de #mi-aporte, a la vista al llegar al ancla
-        if firma_conservada:
-            flash("Tu aporte no cambió: tu firma sigue vigente.", "aporte_ok")
-        else:
-            flash("Tu aporte quedó guardado.", "aporte_ok")
-        if firma_anulada:
-            flash("Tu aporte cambió: vuelve a firmarlo. La firma anterior quedó anulada.", "aporte_error")
-        return redirect(url_for("actas.ver", acta_id=acta_id) + "#mi-aporte")
-    # Error de validación: no se redirige, para no perder lo que la persona escribió
-    return _mostrar_acta(acta_id, usuario_id, 400, aporte=aporte, errores_aporte=errores)
 
 
 # ---------------------------------------- US-013 · firma del aporte y cierre
@@ -617,11 +571,12 @@ def firmar(acta_id):
     return destino
 
 
-def datos_pdf(cur, acta_id, cerrado_por=None):
-    """Diccionario para pdf_acta.generar_pdf_acta con los datos del acta en la BD.
+def datos_pdf(cur, acta_id, cerrado_por=None, borrador=False):
+    """Diccionario para pdf_formato.generar_pdf_acta con los datos del acta en la BD.
 
     Al cerrar se pasa `cerrado_por` y la hora es now(): dentro de la transacción es la
     misma que queda en actas.cerrado_en, así un PDF regenerado después dice lo mismo.
+    Con `borrador` (acta abierta, US-014) now() es la hora en que se generó.
     """
     cur.execute(
         """
@@ -653,10 +608,10 @@ def datos_pdf(cur, acta_id, cerrado_por=None):
         """
         SELECT c.actividad, c.fecha_entrega,
                COALESCE(ur.nombre || ' ' || ur.apellido, c.responsable_texto, 'Sin asignar') AS responsable,
-               p.firmado_en AT TIME ZONE 'America/Bogota' AS firmado_en
+               uc.nombre || ' ' || uc.apellido AS registrado_por, uc.firma_archivo
         FROM acta_compromisos c
         LEFT JOIN usuarios ur ON ur.id = c.responsable_id
-        LEFT JOIN acta_participantes p ON p.acta_id = c.acta_id AND p.usuario_id = c.responsable_id
+        LEFT JOIN usuarios uc ON uc.id = c.creado_por
         WHERE c.acta_id = %s
         ORDER BY c.fecha_entrega, c.id
         """,
@@ -669,7 +624,7 @@ def datos_pdf(cur, acta_id, cerrado_por=None):
         (acta_id,),
     )
     carpeta = adj.carpeta_subidas()
-    firma = lambda f: f"Firmado electrónicamente el {f:%d/%m/%Y %H:%M:%S}" if f else None  # noqa: E731
+    ruta_firma = lambda archivo: str(carpeta / archivo) if archivo else None  # noqa: E731
 
     return {
         "numero_acta": a["numero_acta"],
@@ -692,17 +647,23 @@ def datos_pdf(cur, acta_id, cerrado_por=None):
             "nombre": f"{p['nombre']} {p['apellido']}", "rol": p["rol"],
             "desarrollo": p["desarrollo"], "conclusiones": p["conclusiones"],
             "firmado_en": f"{p['firmado_en']:%d/%m/%Y %H:%M:%S}" if p["firmado_en"] else None,
+            "firma_ruta": ruta_firma(p["firma_archivo"]),  # imagen de «Mi firma»
         } for p in participantes],
         "compromisos": [{
             "actividad": c["actividad"], "fecha": c["fecha_entrega"].strftime("%d/%m/%Y"),
-            "responsable": c["responsable"], "firma": firma(c["firmado_en"]),
+            "responsable": c["responsable"],
+            # Como en la página: la firma de quien registró el compromiso
+            "firma": f"Registrado por {c['registrado_por']}" if c["registrado_por"] else None,
+            "firma_ruta": ruta_firma(c["firma_archivo"]),
         } for c in compromisos],
         "anexos": [{
             "nombre": f["nombre_original"], "tamano_bytes": f["tamano_bytes"],
             "es_imagen": f["es_imagen"], "ruta": str(carpeta / f["nombre_archivo"]),
         } for f in cur.fetchall()],
-        "cerrado_en": a["cerrado_en"],
-        "cerrado_por": a["cerrado_por"],
+        "cerrado_en": None if borrador else a["cerrado_en"],
+        "cerrado_por": None if borrador else a["cerrado_por"],
+        "borrador": borrador,
+        "generado_en": a["cerrado_en"] if borrador else None,
     }
 
 
@@ -764,7 +725,7 @@ def cerrar(acta_id):
                 flash("El acta no tiene participantes que la aprueben.", "cierre_error")
                 return redirect(ver_acta + "#cierre")
 
-            contenido = pdf_acta.generar_pdf_acta(datos_pdf(cur, acta_id, cerrado_por=usuario_id))
+            contenido = pdf_formato.generar_pdf_acta(datos_pdf(cur, acta_id, cerrado_por=usuario_id))
             archivo = f"acta-{acta_id}-{uuid.uuid4().hex}.pdf"
             _escribir_pdf(archivo, contenido)
             # now() es la hora de inicio de la transacción: la misma que dice el PDF
@@ -793,58 +754,6 @@ def cerrar(acta_id):
 
     flash("Acta cerrada. Ya no admite cambios y su PDF está listo para descargar.", "ok")
     return redirect(ver_acta)
-
-
-@actas_bp.route("/<int:acta_id>/pdf")
-@login_requerido
-def descargar_pdf(acta_id):
-    """PDF del acta cerrada, para cualquiera con acceso al acta."""
-    contenido = None
-    try:
-        with transaccion() as cur:
-            _acceso(cur, acta_id, session["usuario_id"])  # 404 si no existe, 403 si no tiene acceso
-            cur.execute(
-                "SELECT numero_acta, nombre_reunion, estado, pdf_archivo, pdf_sha256 "
-                "FROM actas WHERE id = %s",
-                (acta_id,),
-            )
-            acta = cur.fetchone()
-            if acta["estado"] != "cerrada":
-                abort(404)  # el PDF existe solo desde el cierre
-            if not (acta["pdf_archivo"] and _pdf_intacto(
-                    adj.carpeta_subidas() / acta["pdf_archivo"], acta["pdf_sha256"])):
-                # Archivo perdido (p. ej. volumen nuevo) o alterado: se rehace desde la BD,
-                # donde el acta cerrada ya no cambia
-                contenido = pdf_acta.generar_pdf_acta(datos_pdf(cur, acta_id))
-    except psycopg2.Error:
-        current_app.logger.exception("Error de base de datos al descargar el PDF del acta")
-        abort(503)
-
-    nombre = pdf_acta.nombre_descarga(acta["numero_acta"], acta["nombre_reunion"])
-    if contenido is None:
-        respuesta = send_from_directory(
-            adj.carpeta_subidas(), acta["pdf_archivo"], mimetype="application/pdf",
-            as_attachment=True, download_name=nombre,
-        )
-    else:
-        # El PDF sale igual byte a byte con los mismos datos: si coincide con la huella
-        # del cierre se repone en disco; si no (cambió el generador), se entrega sin guardar
-        # para no tocar el acta cerrada.
-        if (acta["pdf_archivo"] and PATRON_PDF.fullmatch(acta["pdf_archivo"])
-                and hashlib.sha256(contenido).hexdigest() == acta["pdf_sha256"]):
-            try:
-                _escribir_pdf(acta["pdf_archivo"], contenido)
-                current_app.logger.warning("PDF del acta %s repuesto en disco", acta_id)
-            except OSError:
-                current_app.logger.exception("No se pudo reponer el PDF del acta %s", acta_id)
-        else:
-            current_app.logger.warning("PDF del acta %s regenerado distinto al del cierre: "
-                                       "se entrega sin guardarlo", acta_id)
-        respuesta = send_file(io.BytesIO(contenido), mimetype="application/pdf",
-                              as_attachment=True, download_name=nombre)
-    respuesta.headers["X-Content-Type-Options"] = "nosniff"
-    respuesta.headers["Cache-Control"] = "private, max-age=300"
-    return respuesta
 
 
 # ------------------------------------------------------- US-012 · adjuntos
@@ -994,9 +903,9 @@ def eliminar_adjunto(acta_id, adjunto_id):
 @actas_bp.app_errorhandler(413)
 def archivo_demasiado_grande(error):
     """La petición completa superó MAX_CONTENT_LENGTH o MAX_FORM_MEMORY_SIZE (ver app.py)."""
-    if request.endpoint == "actas.guardar_aporte":
+    if request.endpoint == "aportes.guardar_aporte":
         flash("Tu aporte es demasiado grande para enviarlo. Recorta el texto: máximo "
-              f"{aportes.miles(aportes.MAX_LARGO_APORTE)} caracteres en el desarrollo y otros tantos "
+              f"{aporte_texto.miles(aporte_texto.MAX_LARGO_APORTE)} caracteres en el desarrollo y otros tantos "
               "en las conclusiones.", "aporte_error")
         return redirect(url_for("actas.ver", acta_id=request.view_args["acta_id"]) + "#mi-aporte")
     if request.endpoint == "actas.subir_adjuntos":

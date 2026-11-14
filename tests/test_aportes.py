@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from flask import Flask, request  # noqa: E402
 from werkzeug.exceptions import RequestEntityTooLarge  # noqa: E402
 
-import aportes  # noqa: E402
-from aportes import MAX_LARGO_APORTE, leer_aporte, normalizar, validar_aporte  # noqa: E402
+import aporte_texto as aportes  # noqa: E402
+from aporte_texto import MAX_LARGO_APORTE, leer_aporte, normalizar, validar_aporte  # noqa: E402
 
 # Texto con tildes, eñes, emoji y saltos de línea como los envía el navegador (\r\n)
 FRASE = "Reunión del equipo: la señora Muñoz explicó el cronograma 😀\r\n"
@@ -188,7 +188,7 @@ class AvisosAporteTest(unittest.TestCase):
         participante = {
             "usuario_id": 1, "nombre": "Ana", "apellido": "Pérez", "rol": actas.ROL_LIDER,
             "es_creador": True, "aporto": False, "desarrollo": None, "conclusiones": None,
-            "aporte_actualizado_en": None,
+            "aporte_actualizado_en": None, "uid": 1, "tiene_firma": False,
         }
         contexto = dict(
             acta=acta, meses=actas.MESES, participantes=[participante], adjuntos=[],
@@ -198,6 +198,7 @@ class AvisosAporteTest(unittest.TestCase):
             accept=adj.ACCEPT_HTML, agenda=["Punto 1"], objetivos=["Objetivo 1"],
             puede_aportar=True, aporte={"desarrollo": None, "conclusiones": None},
             aporte_guardado_en=None, errores_aporte=[], max_aporte=MAX_LARGO_APORTE,
+            compromisos=[], tengo_firma=False, es_participante=True, es_lider=True,
         )
         contexto.update(cambios)
         sin_bd = mock.patch("actas.get_connection", side_effect=psycopg2.OperationalError("sin BD"))
