@@ -219,10 +219,10 @@ def leer_formulario(form):
     }
 
 
-def validar(cur, datos, permisos, catalogo=None):
+def validar(cur, datos, permisos, catalogo):
     """Valida los datos en el servidor. Devuelve (errores, valores ya convertidos).
 
-    `catalogo` es (regionales, centros) ya cargados; si no llega, se consulta.
+    `catalogo` es (regionales, centros), ya cargados con cargar_catalogos().
     """
     errores = []
 
@@ -261,7 +261,7 @@ def validar(cur, datos, permisos, catalogo=None):
 
     regional_id = _entero(datos["regional_id"])
     centro_id = _entero(datos["centro_id"])
-    regionales, centros = catalogo or cargar_catalogos(cur)
+    regionales, centros = catalogo
     errores += errores_lugar(regional_id, centro_id, regionales, centros)
 
     ficha_id = mes = None
