@@ -69,7 +69,9 @@ def login():
  
         try:
             usuario = buscar_usuario_por_correo(correo)
-        except psycopg2.Error as error:
+        except (psycopg2.Error, UnicodeDecodeError) as error:
+            # UnicodeDecodeError: en Windows, PostgreSQL en español rechaza la conexión
+            # (clave o base equivocada) con un mensaje que psycopg2 no puede leer.
             app.logger.error("Error de base de datos: %s", error)
             flash("No pudimos conectar con el servidor. Intenta de nuevo en unos minutos.")
             return render_template("Login.html", correo=correo)
