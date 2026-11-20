@@ -2,6 +2,7 @@
 US-013 · Aporte del participante, compromisos y firma.
 
 - Aporte: cada participante escribe su desarrollo y conclusiones (acta abierta).
+  Textos largos (US-020): el límite y la normalización están en aporte_texto.py.
 - Compromisos: actividad, fecha, responsable (otro participante del acta) y la
   firma de quien lo registra.
 - Firma: imagen JPG/PNG que la persona sube una vez y se reutiliza en los
@@ -14,11 +15,11 @@ from flask import (Blueprint, abort, current_app, flash, redirect, request,
                    send_from_directory, session, url_for)
 
 import adjuntos as adj
-from actas import _acceso, _entero, login_requerido, transaccion
+import aporte_texto
+from actas import _acceso, _entero, _mostrar_acta, login_requerido, transaccion
 
 aportes_bp = Blueprint("aportes", __name__)
 
-MAX_TEXTO_APORTE = 5000
 MAX_ACTIVIDAD = 300
 MAX_BYTES_FIRMA = 2 * 1024 * 1024
 
@@ -31,30 +32,49 @@ def _volver(acta_id, ancla):
 @aportes_bp.route("/actas/<int:acta_id>/aporte", methods=["POST"])
 @login_requerido
 def guardar_aporte(acta_id):
-    desarrollo = request.form.get("desarrollo", "").strip()
-    conclusiones = request.form.get("conclusiones", "").strip()
-    if len(desarrollo) > MAX_TEXTO_APORTE or len(conclusiones) > MAX_TEXTO_APORTE:
-        flash(f"Cada campo admite máximo {MAX_TEXTO_APORTE} caracteres.", "error")
-        return _volver(acta_id, "aporte")
+    """Cada participante registra o corrige su desarrollo y sus conclusiones (US-020)."""
+    usuario_id = session["usuario_id"]
+    aporte = aporte_texto.leer_aporte(request.form)
+    errores = aporte_texto.validar_aporte(aporte)
+    abierta = guardado = False
     try:
         with transaccion() as cur:
-            acceso = _acceso(cur, acta_id, session["usuario_id"])
-            if acceso["acta"]["estado"] != "abierta":
-                flash("El acta ya no está abierta: no se puede modificar tu aporte.", "error")
-                return _volver(acta_id, "aporte")
-            # Un aporte vacío se guarda como NULL para que el acta lo muestre "Pendiente"
+            _acceso(cur, acta_id, usuario_id)  # 404 si no existe, 403 si no tiene acceso
+            # Bloquea el acta hasta terminar: nadie la cierra a mitad del guardado
+            cur.execute("SELECT estado FROM actas WHERE id = %s FOR SHARE", (acta_id,))
+            abierta = cur.fetchone()["estado"] == "abierta"
+            # Solo escribe quien tiene fila de participante (el líder también la necesita);
+            # Administrador y Coordinador que no participan solo leen. 403 sea cual sea el texto.
             cur.execute(
-                "UPDATE acta_participantes SET desarrollo = %s, conclusiones = %s "
-                "WHERE acta_id = %s AND usuario_id = %s",
-                (desarrollo or None, conclusiones or None, acta_id, session["usuario_id"]),
+                "SELECT 1 FROM acta_participantes WHERE acta_id = %s AND usuario_id = %s FOR UPDATE",
+                (acta_id, usuario_id),
             )
-            if cur.rowcount == 0:
-                abort(403)  # el líder o admin que no es participante no tiene aporte
-        flash("Tu aporte quedó registrado.", "ok")
+            if cur.fetchone() is None:
+                abort(403)
+            if abierta and not errores:
+                cur.execute(
+                    """
+                    UPDATE acta_participantes
+                    SET desarrollo = %s, conclusiones = %s, aporte_actualizado_en = now()
+                    WHERE acta_id = %s AND usuario_id = %s
+                    """,
+                    (aporte["desarrollo"], aporte["conclusiones"], acta_id, usuario_id),
+                )
+                guardado = True
     except psycopg2.Error:
         current_app.logger.exception("Error de base de datos al guardar el aporte")
-        flash("No pudimos guardar tu aporte. Intenta de nuevo.", "error")
-    return _volver(acta_id, "aporte")
+        errores = ["No pudimos guardar tu aporte. Tu texto sigue aquí: intenta de nuevo."]
+        return _mostrar_acta(acta_id, usuario_id, 503, aporte=aporte, errores_aporte=errores)
+
+    if not abierta:
+        flash("El acta ya no está abierta: no se puede registrar ni cambiar el aporte.", "error")
+        return redirect(url_for("actas.ver", acta_id=acta_id))
+    if guardado:
+        # aporte_ok/aporte_error se pintan dentro de #mi-aporte, a la vista al llegar al ancla
+        flash("Tu aporte quedó guardado.", "aporte_ok")
+        return redirect(url_for("actas.ver", acta_id=acta_id) + "#mi-aporte")
+    # Error de validación: no se redirige, para no perder lo que la persona escribió
+    return _mostrar_acta(acta_id, usuario_id, 400, aporte=aporte, errores_aporte=errores)
 
 
 # ---------------------------------------------------------------- compromisos
