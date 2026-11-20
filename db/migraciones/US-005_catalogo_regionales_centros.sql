@@ -29,6 +29,8 @@
 --   se publican allí. Cruzado con los datos abiertos del SENA en datos.gov.co
 --   (conjunto vv8g-8u9u). Única corrección: el centro 9110 de Boyacá va como
 --   "Centro de Desarrollo Agropecuario y Agroindustrial", como en datos.gov.co.
+--   La regional de San Andrés va como "San Andrés y Providencia", el nombre
+--   que trae el esquema del equipo, para no crear una segunda regional.
 
 BEGIN;
 
@@ -62,7 +64,7 @@ FROM (VALUES
     ('Regional Putumayo'),
     ('Regional Quindío'),
     ('Regional Risaralda'),
-    ('Regional San Andrés'),
+    ('Regional San Andrés y Providencia'),
     ('Regional Santander'),
     ('Regional Sucre'),
     ('Regional Tolima'),
@@ -178,7 +180,7 @@ FROM (VALUES
     ('Regional Risaralda', 'Centro Atención Sector Agropecuario'),
     ('Regional Risaralda', 'Centro de Diseño e Innovación Tecnológica Industrial'),
     ('Regional Risaralda', 'Centro de Comercio y Servicios'),
-    ('Regional San Andrés', 'Centro de Formación Turística, Gente de Mar y de Servicios'),
+    ('Regional San Andrés y Providencia', 'Centro de Formación Turística, Gente de Mar y de Servicios'),
     ('Regional Santander', 'Centro de Atención al Sector Agropecuario'),
     ('Regional Santander', 'Centro Industrial de Mantenimiento Integral'),
     ('Regional Santander', 'Centro Industrial del Diseño y la Manufactura'),
