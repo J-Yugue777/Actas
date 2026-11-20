@@ -8,7 +8,7 @@
 --   lider@actas.local       Instructor líder de la ficha 3210115
 --   instructor@actas.local  Instructor de la ficha 3210115 (no crea actas)
 --
--- Para crear un usuario propio: python crear_usuario.py
+-- Para crear un usuario propio: py crear_usuario.py (en Windows) o python crear_usuario.py
 -- =====================================================================
 
 BEGIN;
