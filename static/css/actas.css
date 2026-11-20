@@ -257,3 +257,77 @@
 .firma-img { max-height: 48px; max-width: 140px; background: #fff; border: 1px solid #dfe8e2; border-radius: 6px; padding: 2px; }
 .firma-grande { max-height: 110px; max-width: 280px; margin-bottom: 0.8rem; }
 .acta-form textarea, .adjuntar textarea { width: 100%; font: inherit; padding: 0.6rem 0.8rem; border: 1.5px solid #c9d6ce; border-radius: 8px; resize: vertical; }
+
+/* ---- Aporte de cada participante (US-020) ---- */
+.nota-numero a { font-weight: 700; color: var(--verde-texto); }
+.form-aporte { display: grid; gap: 1.1rem; }
+.form-aporte textarea { min-height: 14rem; line-height: 1.55; resize: vertical; }
+.campo textarea:hover { border-color: #b9ccc1; }
+.campo textarea:focus-visible { outline: none; border-color: var(--verde-sena); box-shadow: var(--anillo); }
+.campo textarea[aria-invalid="true"] { border-color: var(--rojo); }
+.campo-pie { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 1rem; }
+.campo-pie .ayuda { flex: 1 1 16rem; }
+.campo-pie .contador-aporte { flex: 0 0 auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.contador-aporte.excedido { color: var(--rojo); font-weight: 700; }
+.aviso-recorte { margin: 0.4rem 0 0; }
+.form-aporte .btn-primario { justify-self: start; width: auto; margin: 0; padding: 0.8rem 1.8rem; }
+.panel-cab.envuelve { flex-wrap: wrap; row-gap: 0.25rem; }
+#mi-aporte .alerta-lista { margin-top: 0; }
+#errores-aporte:focus { outline: none; }
+/* La barra superior es sticky: al saltar a un ancla deja espacio para que no tape el título */
+#mi-aporte, #aportes, #adjuntos, #errores-aporte { scroll-margin-top: 6rem; }
+
+.aporte { min-width: 0; padding: 1rem 1.15rem; border: 1px solid var(--borde); border-radius: 12px; }
+.aporte + .aporte { margin-top: 0.9rem; }
+.aporte-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.7rem; padding-bottom: 0.6rem; border-bottom: 1px solid #eef3f0; }
+.aporte-cab h3 { font-size: 0.95rem; color: var(--azul-titulo); }
+.aporte-cab h3 small { font-weight: 500; color: var(--texto-suave); }
+.aporte-cab span { font-size: 0.78rem; color: var(--texto-suave); }
+.aporte h4 { margin: 0.9rem 0 0.3rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--texto-suave); }
+/* Texto completo, con sus saltos de línea, sin desbordar aunque traiga palabras larguísimas */
+.aporte-texto { font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vacio-ilustrado.vacio-aportes { gap: 0.3rem; padding: 1.5rem 1rem; }
+.vacio-aportes .sub { margin: 0; font-size: 0.85rem; }
+
+/* ---- Firma del aporte (US-013) ---- */
+.firma-aporte {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1rem;
+  margin-top: 1.25rem; padding: 0.9rem 1rem;
+  background: var(--amarillo-claro); border: 1px solid #f1dd8f; border-radius: 12px;
+}
+.firma-aporte.firmada { background: var(--verde-claro); border-color: #c4e6ad; }
+.firma-aporte .estado-icono { flex: none; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; color: var(--amarillo); background: #fff; border-radius: 50%; }
+.firma-aporte.firmada .estado-icono { color: var(--verde-texto); }
+.firma-aporte .estado-icono .icono { width: 1.2rem; height: 1.2rem; }
+.firma-texto { flex: 1 1 16rem; display: grid; gap: 0.15rem; }
+.firma-texto strong { font-size: 0.92rem; color: var(--azul-titulo); }
+.firma-texto small { font-size: 0.8rem; color: var(--texto-suave); }
+.firma-aporte form { margin: 0; }
+.firma-aporte .btn-sec { padding: 0.65rem 1.3rem; }
+.firma-aporte .btn-sec:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+.firma-aporte .btn-sec:disabled:hover { background: #fff; border-color: var(--borde); }
+
+/* ---- Cierre del acta y PDF (US-013) ---- */
+.progreso-cierre {
+  display: block; width: 100%; height: 0.6rem; margin: 0 0 1rem;
+  appearance: none; border: 0; border-radius: 999px; background: #e9eeeb; overflow: hidden;
+}
+.progreso-cierre::-webkit-progress-bar { background: #e9eeeb; border-radius: 999px; }
+.progreso-cierre::-webkit-progress-value { background: linear-gradient(90deg, var(--verde-sena), #6fd43a); border-radius: 999px; }
+.progreso-cierre::-moz-progress-bar { background: linear-gradient(90deg, var(--verde-sena), #6fd43a); border-radius: 999px; }
+.cierre-texto { margin: 0 0 0.6rem; font-size: 0.88rem; }
+.cierre-texto.listo { display: flex; align-items: center; gap: 0.45rem; font-weight: 600; color: var(--verde-texto); }
+.cierre-texto .icono { flex: none; width: 1.15rem; height: 1.15rem; }
+.faltantes { display: grid; gap: 0.45rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.faltantes li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; padding: 0.55rem 0.8rem; font-size: 0.88rem; border: 1px solid var(--borde); border-radius: 10px; }
+.panel-cierre form { margin: 0; }
+.panel-cierre .btn-primario { width: auto; margin: 0.4rem 0 0; padding: 0.8rem 1.8rem; }
+.panel-cierre .btn-primario:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: none; }
+.panel-cierre .btn-primario:disabled:hover { background: linear-gradient(180deg, #34a30f, var(--verde)); }
+
+.btn-pdf { display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; text-decoration: none; }
+.btn-pdf .icono { width: 1.1rem; height: 1.1rem; }
+/* Borrador del PDF con el acta abierta (US-014) y firma con imagen en la tabla de participantes */
+.acciones .btn-sec { display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; }
+.acciones .btn-sec .icono { width: 1.05rem; height: 1.05rem; }
+.celda-firma { display: flex; flex-direction: column; align-items: flex-start; gap: 0.3rem; }
