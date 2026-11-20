@@ -9,7 +9,7 @@
 --
 -- Docker lo corre solo la primera vez (docker compose up). En pgAdmin:
 -- ábrelo en el Query Tool de la base "actas" y ejecútalo; después corre
--- 02_datos_demo.sql para tener usuarios con los que entrar.
+-- 02_datos_demo.sql (usuarios para entrar) y los archivos de db/migraciones/.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -209,7 +209,8 @@ CREATE TABLE acta_anexos (
 );
 
 -- =====================================================================
--- 6. CAMBIOS POSTERIORES (aquí ya van incluidos para una base nueva).
+-- 6. CAMBIOS POSTERIORES. También están en db/migraciones/; van aquí para que
+--    una base nueva funcione aunque no se corran las migraciones.
 --    En una base que ya existía, corre los archivos de db/migraciones/.
 -- =====================================================================
 
