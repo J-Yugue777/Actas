@@ -18,9 +18,7 @@ fecha_nacimiento = date.fromisoformat(input("Fecha de nacimiento (AAAA-MM-DD): "
 correo = input("Correo: ").strip()
 password = getpass("Contraseña: ")
 nombre_rol = input("Nombre del rol (ej. Administrador): ").strip()
-tipo_vinculacion = input("Tipo de vinculación (ej. Carrera administrativa, Provisional, Contratista): ").strip()
-direccion = input("Dirección: ").strip()
-telefono = input("Teléfono: ").strip()
+tipo_vinculacion = input("Tipo de vinculación (ej. contratista, provisional, carrera administrativa): ").strip()
 
 with get_connection() as conn:
     with conn.cursor() as cur:
@@ -35,14 +33,13 @@ with get_connection() as conn:
         cur.execute(
             """
             INSERT INTO usuarios
-                (nombre, apellido, tipo_documento, fecha_nacimiento, correo,
-                 password_hash, tipo_vinculacion, direccion, telefono, rol_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (nombre, apellido, "Tipo_documento", fecha_nacimiento, correo,
+                 password_hash, tipo_vinculacion, rol_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (nombre, apellido, tipo_documento, fecha_nacimiento, correo,
              generate_password_hash(password),
-             tipo_vinculacion or None, direccion or None, telefono or None,
-             rol_id),
+             tipo_vinculacion or None, rol_id),
         )
 
 print("Usuario creado correctamente.")

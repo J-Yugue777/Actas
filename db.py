@@ -20,6 +20,7 @@ def get_connection():
         user=os.environ["DB_USER"],
         password=os.environ["DB_PASSWORD"],
         cursor_factory=RealDictCursor,
+        options="-c lc_messages=C",
     )
 
 

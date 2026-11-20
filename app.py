@@ -8,7 +8,6 @@ import secrets, hashlib, uuid
 import threading
 import os
 from datetime import datetime, timedelta
-import vt
 import time
 import requests
 from werkzeug.utils import secure_filename
@@ -162,7 +161,8 @@ def eliminar_item_acta(acta_id, item_id):
 
 #************INICIO DEL SERVIDOR***********
 
-
+for regla in app.url_map.iter_rules():
+    print(regla.endpoint, "->", regla.rule, sorted(regla.methods))
 if __name__ == '__main__':
     print("Iniciando servidor ...")
     app.run(debug=True, host='0.0.0.0', port=5000)
