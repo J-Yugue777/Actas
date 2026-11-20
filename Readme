@@ -2,13 +2,59 @@
 
 ## Puesta en marcha (para quien clona el repositorio)
 
-1. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-2. Copiar `.env.example` a `.env` (puedes dejar los valores tal cual en desarrollo).
-3. Levantar la base de datos:  `docker compose up -d`
-4. Instalar dependencias:  `pip install -r requirements.txt`
-5. Ejecutar la app:  `python app.py`
+La base de datos está en `db/init/`:
 
-Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
+- `01_esquema.sql` crea todas las tablas.
+- `02_datos_demo.sql` crea usuarios de prueba, un programa, una ficha y su equipo ejecutor.
+
+Elige uno de los dos caminos.
+
+### Camino 1: con PostgreSQL instalado (pgAdmin), sin Docker
+
+1. En pgAdmin, crea una base de datos llamada `actas`: clic derecho en *Databases* > *Create* > *Database*.
+2. Clic derecho en la base `actas` > *Query Tool*. Abre `db/init/01_esquema.sql` y ejecútalo con F5.
+   Después abre `db/init/02_datos_demo.sql` y ejecútalo también.
+3. Copia el archivo `env.ejemplo` con el nombre `.env` (punto env), en la misma carpeta de `app.py`.
+   En `DB_PASSWORD` pon la contraseña que elegiste al instalar PostgreSQL.
+4. Instala las dependencias: `pip install -r requirements.txt`
+5. Ejecuta la app con `python app.py` y abre http://localhost:5000
+
+### Camino 2: con Docker Desktop
+
+1. Copia `env.ejemplo` con el nombre `.env` (puedes dejar los valores tal cual).
+2. `docker compose up -d --build` levanta la base y la app. Abre http://localhost:5000.
+   Si prefieres correr la app en tu máquina, levanta solo la base con `docker compose up -d db`,
+   instala las dependencias y ejecuta `python app.py`.
+
+La primera vez, Docker corre solo los archivos de `db/init/` y la base queda con tablas y usuarios.
+
+### Para entrar
+
+Se entra con el **correo**, no con el documento. Todos los usuarios de prueba tienen la contraseña `Demo12345`.
+
+| Correo                   | Rol                                                       |
+| ------------------------ | --------------------------------------------------------- |
+| `admin@actas.local`      | Administrador: ve todo, gestiona usuarios y crea actas    |
+| `lider@actas.local`      | Instructor líder de la ficha 3210115: crea actas de la ficha |
+| `instructor@actas.local` | Instructor de la ficha 3210115: aporta, pero no crea actas |
+
+Para crear un usuario propio: `python crear_usuario.py`.
+
+### Si algo falla
+
+- **"No pudimos conectar con el servidor"**: la app no llega a la base. Revisa en `.env` que `DB_HOST`, `DB_PORT`,
+  `DB_NAME`, `DB_USER` y `DB_PASSWORD` sean los mismos de pgAdmin. Con Docker, `docker compose ps` debe mostrar
+  `proyecto_db` como *healthy*.
+- **"Correo o contraseña incorrectos"**: la base no tiene ese usuario. Corre `db/init/02_datos_demo.sql`
+  o crea uno con `python crear_usuario.py`.
+- **`KeyError: 'SECRET_KEY'` o `KeyError: 'DB_NAME'` al arrancar**: la app no encuentra el `.env`. Debe llamarse
+  exactamente `.env` y estar al lado de `app.py`. El Bloc de notas a veces lo guarda como `.env.txt`.
+- **`UnicodeDecodeError: 'utf-8' codec can't decode byte...` al conectar (Windows)**: PostgreSQL rechazó la conexión
+  y respondió en español. Casi siempre la contraseña de `.env` está mal o la base `actas` no existe.
+- **Docker dice que el puerto 5432 ya está en uso**: ya tienes un PostgreSQL instalado en ese puerto.
+  Pon `DB_PORT=5433` en `.env` y vuelve a correr `docker compose up -d`.
+- **Cambié `db/init/` y Docker no lo tomó**: Docker solo corre esos archivos cuando la base está vacía.
+  `docker compose down -v && docker compose up -d` la crea de nuevo (borra los datos).
 
 ## Comandos útiles
 
@@ -18,8 +64,12 @@ Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
                          `docker compose down -v && docker compose up -d`
 
 ## Cambiar la estructura de la BD
-Edita/agrega archivos en `db/init/` (ej. `03_nueva_tabla.sql`), haz commit,
-y cada colaborador corre el comando de "reiniciar desde cero".
+
+- Para quien crea la base desde cero: agrega el cambio al final de `db/init/01_esquema.sql`.
+- Para quien ya tiene la base: agrega también un archivo en `db/migraciones/` que se pueda correr más de una vez
+  (`ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`). Cada colaborador lo corre en pgAdmin.
+
+Si ya tenías la base creada, no corras `01_esquema.sql` otra vez. Corre los archivos de `db/migraciones/`.
 
 
 ## Layer 002
@@ -28,7 +78,7 @@ y cada colaborador corre el comando de "reiniciar desde cero".
 ## Opción A: todo con Docker (app + base de datos)
 
 1. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-2. Copiar `.env.example` a `.env`.
+2. Copiar `env.ejemplo` a `.env`.
 3. `docker compose up -d --build`
 4. Abrir http://localhost:5000
 
@@ -38,7 +88,7 @@ y cada colaborador corre el comando de "reiniciar desde cero".
 2. `pip install -r requirements.txt`
 3. `python app.py`   (con `DB_HOST=localhost` en tu `.env`)
 
-Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
+Usuarios de prueba: ver "Para entrar" arriba (se entra con el correo y la contraseña `Demo12345`).
 
 ## Comandos útiles
 
