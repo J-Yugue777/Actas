@@ -1,13 +1,13 @@
 aiofiles==25.1.0
 aiohappyeyeballs==2.6.1
-aiohttp==3.13.3
+aiohttp==3.14.4
 aiosignal==1.4.0
 attrs==25.4.0
 Authlib==1.6.8
 blinker==1.9.0
-bson==0.5.10
+bson==0.5.10; python_version < "3.14"
 certifi==2026.1.4
-cffi==2.0.0
+cffi==2.1.0
 charset-normalizer==3.4.4
 click==8.3.0
 colorama==0.4.6
@@ -20,24 +20,24 @@ frozenlist==1.8.0
 idna==3.11
 itsdangerous==2.2.0
 Jinja2==3.1.6
-MarkupSafe==3.0.3
+MarkupSafe==3.0.4
 multidict==6.7.0
-pillow==12.2.0
+pillow==12.3.0
 propcache==0.4.1
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.13
 pyClamd==0.4.0
 pycparser==3.0
-pygame==2.6.1
-pymongo==4.17.0
+pygame==2.6.1; python_version < "3.14"
+pymongo==4.19.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
-pywin32==311; sys_platform == "win32"
+pywin32==312; sys_platform == "win32"
 reportlab==4.5.1
 requests==2.32.5
 six==1.17.0
 urllib3==2.6.3
 vt-py==0.22.0
 Werkzeug==3.1.3
-yara-python==4.5.4
-yarl==1.22.0
+yara-python==4.5.4; python_version < "3.14"
+yarl==1.25.1
 gunicorn==21.2.0
