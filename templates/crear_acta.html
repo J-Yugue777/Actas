@@ -97,11 +97,30 @@
           {% endfor %}
         </select>
       </div>
+      {# US-005: el servidor pinta todos los centros agrupados por regional (sirve sin JavaScript);
+         el script deja solo los de la regional elegida. #}
+      {% set regional_elegida = grupos_centros|selectattr('id', 'equalto', datos.regional_id|int(0))|first %}
       <div class="campo">
         <label for="centro_id">Centro de formación</label>
-        <select id="centro_id" name="centro_id" required disabled>
-          <option value="">Primero elige la regional</option>
+        <select id="centro_id" name="centro_id" required aria-describedby="ayuda-centro">
+          <option value="">Selecciona el centro…</option>
+          {% for g in grupos_centros if g.centros %}
+          <optgroup label="{{ g.nombre }}" data-regional="{{ g.id }}">
+            {% for c in g.centros %}
+            <option value="{{ c.id }}" {{ 'selected' if datos.centro_id == c.id|string }}>{{ c.nombre }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endfor %}
         </select>
+        <small class="ayuda{{ ' ayuda-aviso' if regional_elegida and not regional_elegida.centros }}" id="ayuda-centro" aria-live="polite">
+          {%- if not regional_elegida -%}
+          Elige un centro de la regional seleccionada; están agrupados por regional.
+          {%- elif regional_elegida.centros -%}
+          {{ regional_elegida.centros|length }} {{ 'centro' if regional_elegida.centros|length == 1 else 'centros' }} en {{ regional_elegida.nombre }}
+          {%- else -%}
+          {{ regional_elegida.nombre }} no tiene centros de formación registrados. Elige otra regional.
+          {%- endif -%}
+        </small>
       </div>
 
       <div class="campo">
@@ -150,28 +169,39 @@
 
 {% block scripts %}
 <script>
-  const CENTROS = {{ centros|tojson }};
-  const CENTRO_ELEGIDO = {{ (datos.centro_id or '')|tojson }};
-
-  // Centros dependientes de la regional
+  // Centros dependientes de la regional. El servidor ya pintó todos los centros
+  // agrupados por regional (optgroup); aquí se guardan y se deja solo el grupo elegido.
   const selRegional = document.getElementById('regional_id');
   const selCentro = document.getElementById('centro_id');
+  const ayudaCentro = document.getElementById('ayuda-centro');
+  const CENTROS = {};
+  selCentro.querySelectorAll('optgroup').forEach(g => {
+    CENTROS[g.dataset.regional] = Array.from(g.querySelectorAll('option'));
+  });
+  const CENTRO_ELEGIDO = selCentro.value;
 
   function llenarCentros(preseleccion) {
+    const opciones = CENTROS[selRegional.value] || [];
+    const regional = selRegional.value ? selRegional.selectedOptions[0].textContent.trim() : '';
     selCentro.innerHTML = '';
     const vacio = document.createElement('option');
     vacio.value = '';
-    vacio.textContent = selRegional.value ? 'Selecciona el centro…' : 'Primero elige la regional';
+    if (!regional) vacio.textContent = 'Primero elige la regional';
+    else if (!opciones.length) vacio.textContent = 'Sin centros registrados';
+    else vacio.textContent = 'Selecciona el centro…';
     selCentro.appendChild(vacio);
 
-    CENTROS.filter(c => String(c.regional_id) === selRegional.value).forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.id;
-      o.textContent = c.nombre;
-      if (String(c.id) === String(preseleccion)) o.selected = true;
+    opciones.forEach(o => {
+      o.selected = o.value === String(preseleccion);
       selCentro.appendChild(o);
     });
-    selCentro.disabled = !selRegional.value;
+    if (!opciones.some(o => o.selected)) vacio.selected = true;
+    selCentro.disabled = !opciones.length;
+
+    if (!regional) ayudaCentro.textContent = 'Elige primero la regional para ver sus centros.';
+    else if (!opciones.length) ayudaCentro.textContent = `${regional} no tiene centros de formación registrados. Elige otra regional.`;
+    else ayudaCentro.textContent = `${opciones.length} ${opciones.length === 1 ? 'centro' : 'centros'} en ${regional}`;
+    ayudaCentro.classList.toggle('ayuda-aviso', Boolean(regional) && !opciones.length);
   }
   selRegional.addEventListener('change', () => llenarCentros(''));
   llenarCentros(CENTRO_ELEGIDO);

@@ -129,6 +129,53 @@ def cargar_catalogos(cur):
     return regionales, centros
 
 
+# ------------------------------------------- US-005 · regional y centro
+def agrupar_centros(regionales, centros):
+    """Centros agrupados bajo su regional, en el orden de `regionales`.
+
+    Las regionales sin centros también salen (con la lista vacía).
+    """
+    por_regional = {r["id"]: [] for r in regionales}
+    for c in centros:
+        if c["regional_id"] in por_regional:
+            por_regional[c["regional_id"]].append(c)
+    return [{"id": r["id"], "nombre": r["nombre"], "centros": por_regional[r["id"]]}
+            for r in regionales]
+
+
+def errores_lugar(regional_id, centro_id, regionales, centros):
+    """Revisa la regional y el centro (ya convertidos a entero) contra el catálogo."""
+    if regional_id is None:
+        return ["Selecciona la dirección regional."]
+    if regional_id not in {r["id"] for r in regionales}:
+        return ["La regional elegida no existe. Vuelve a elegirla de la lista."]
+
+    regional_del_centro = {c["id"]: c["regional_id"] for c in centros}
+    if centro_id is None:
+        if regional_id not in regional_del_centro.values():
+            return ["La regional elegida no tiene centros de formación registrados. Elige otra regional."]
+        return ["Selecciona el centro de formación."]
+    if centro_id not in regional_del_centro:
+        return ["El centro de formación elegido no existe. Vuelve a elegirlo de la lista."]
+    if regional_del_centro[centro_id] != regional_id:
+        return ["El centro de formación no pertenece a la regional elegida."]
+    return []
+
+
+def lugar_a_conservar(regional_id, centro_id, regionales, centros):
+    """Regional y centro que se vuelven a mostrar cuando el formulario tiene errores.
+
+    La regional solo si existe; el centro solo si pertenece a esa regional.
+    """
+    regional = _entero(regional_id)
+    centro = _entero(centro_id)
+    if regional not in {r["id"] for r in regionales}:
+        return "", ""
+    if not any(c["id"] == centro and c["regional_id"] == regional for c in centros):
+        return str(regional), ""
+    return str(regional), str(centro)
+
+
 # ---------------------------------------------------------------- formulario
 def datos_iniciales(permisos):
     return {
@@ -172,8 +219,11 @@ def leer_formulario(form):
     }
 
 
-def validar(cur, datos, permisos):
-    """Valida los datos en el servidor. Devuelve (errores, valores ya convertidos)."""
+def validar(cur, datos, permisos, catalogo):
+    """Valida los datos en el servidor. Devuelve (errores, valores ya convertidos).
+
+    `catalogo` es (regionales, centros), ya cargados con cargar_catalogos().
+    """
     errores = []
 
     tipos_permitidos = ["otros_asuntos"] + (["equipo_ejecutor"] if permisos["fichas"] else [])
@@ -211,15 +261,8 @@ def validar(cur, datos, permisos):
 
     regional_id = _entero(datos["regional_id"])
     centro_id = _entero(datos["centro_id"])
-    if not regional_id or not centro_id:
-        errores.append("Selecciona la regional y el centro de formación.")
-    else:
-        cur.execute(
-            "SELECT 1 FROM centros_formacion WHERE id = %s AND regional_id = %s",
-            (centro_id, regional_id),
-        )
-        if cur.fetchone() is None:
-            errores.append("El centro de formación no pertenece a la regional elegida.")
+    regionales, centros = catalogo
+    errores += errores_lugar(regional_id, centro_id, regionales, centros)
 
     ficha_id = mes = None
     if datos["tipo_acta"] == "equipo_ejecutor":
@@ -351,11 +394,13 @@ def crear():
 
             if request.method == "POST":
                 datos = leer_formulario(request.form)
-                errores, valores = validar(cur, datos, permisos)
+                errores, valores = validar(cur, datos, permisos, (regionales, centros))
                 if not errores:
                     acta_id, numero = guardar_acta(cur, usuario_id, valores)
                     flash(f"{numero} creada. Ya está abierta para recibir aportes.", "ok")
                     return redirect(url_for("actas.ver", acta_id=acta_id))
+                datos["regional_id"], datos["centro_id"] = lugar_a_conservar(
+                    datos["regional_id"], datos["centro_id"], regionales, centros)
     except psycopg2.errors.UniqueViolation:
         errores = ["No se pudo guardar: ya existe un acta para esa ficha y mes, "
                    "o alguien más la creó al mismo tiempo. Intenta de nuevo."]
@@ -365,7 +410,8 @@ def crear():
 
     return render_template(
         "crear_acta.html",
-        datos=datos, errores=errores, regionales=regionales, centros=centros,
+        datos=datos, errores=errores, regionales=regionales,
+        grupos_centros=agrupar_centros(regionales, centros),
         fichas=permisos["fichas"], puede_equipo=bool(permisos["fichas"]), meses=MESES,
     )
 
