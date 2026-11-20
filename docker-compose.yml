@@ -19,7 +19,9 @@ services:
       retries: 10
 
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: dockerfile   # el archivo se llama en minúscula
     container_name: proyecto_web
     restart: unless-stopped
     env_file: .env
