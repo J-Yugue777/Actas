@@ -65,14 +65,16 @@ def login():
  
         if not correo or not password:
             flash("Escribe tu correo y tu contraseña.")
-            return render_template("login.html", correo=correo)
+            return render_template("Login.html", correo=correo)
  
         try:
             usuario = buscar_usuario_por_correo(correo)
-        except psycopg2.Error as error:
+        except (psycopg2.Error, UnicodeDecodeError) as error:
+            # UnicodeDecodeError: en Windows, PostgreSQL en español rechaza la conexión
+            # (clave o base equivocada) con un mensaje que psycopg2 no puede leer.
             app.logger.error("Error de base de datos: %s", error)
             flash("No pudimos conectar con el servidor. Intenta de nuevo en unos minutos.")
-            return render_template("login.html", correo=correo)
+            return render_template("Login.html", correo=correo)
  
         credenciales_validas = (
             usuario is not None
@@ -83,11 +85,11 @@ def login():
         if not credenciales_validas:
             # Mensaje genérico: no revela si el correo existe o no
             flash("Correo o contraseña incorrectos.")
-            return render_template("login.html", correo=correo)
+            return render_template("Login.html", correo=correo)
  
         if not usuario["activo"]:
             flash("Tu cuenta está desactivada. Contacta al administrador.")
-            return render_template("login.html", correo=correo)
+            return render_template("Login.html", correo=correo)
  
         session.clear()
         session["usuario_id"] = usuario["id"]
@@ -95,7 +97,7 @@ def login():
         session["rol"] = usuario["rol"]
         return redirect(url_for("inicio"))
  
-    return render_template("login.html", correo="")
+    return render_template("Login.html", correo="")
  
  
 @app.route("/inicio")

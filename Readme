@@ -2,54 +2,109 @@
 
 ## Puesta en marcha (para quien clona el repositorio)
 
-1. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-2. Copiar `.env.example` a `.env` (puedes dejar los valores tal cual en desarrollo).
-3. Levantar la base de datos:  `docker compose up -d`
-4. Instalar dependencias:  `pip install -r requirements.txt`
-5. Ejecutar la app:  `python app.py`
+La base de datos está en `db/`:
 
-Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
+- `db/init/01_esquema.sql` crea todas las tablas.
+- `db/init/02_datos_demo.sql` crea usuarios de prueba, un programa, una ficha y su equipo ejecutor.
+- `db/migraciones/` tiene los cambios de estructura que se agregaron después. Todos se pueden correr más de una vez.
+- `db/init/03_migraciones.sh` lo usa solo Docker para aplicar `db/migraciones/`. En pgAdmin no lo abras.
 
-## Comandos útiles
+Necesitas Python 3.12 o más reciente. En Windows, usa `py` en lugar de `python` y `py -m pip` en lugar de `pip`.
 
-- Ver estado:            `docker compose ps`
-- Apagar:                `docker compose down`
-- Reiniciar la BD desde cero (borra datos y vuelve a correr los scripts):
-                         `docker compose down -v && docker compose up -d`
+Elige uno de los dos caminos.
 
-## Cambiar la estructura de la BD
-Edita/agrega archivos en `db/init/` (ej. `03_nueva_tabla.sql`), haz commit,
-y cada colaborador corre el comando de "reiniciar desde cero".
+### Camino 1: con PostgreSQL instalado (pgAdmin), sin Docker
 
+1. Abre pgAdmin. En el panel izquierdo despliega *Servers* > *PostgreSQL 18* (el número es tu versión)
+   y escribe la contraseña que elegiste al instalar PostgreSQL.
+   Luego haz clic derecho en *Databases* > *Create* > *Database...*, escribe `actas` y pulsa *Save*.
+   En pgAdmin en español: *Servidores*, *Bases de Datos* > *Crear* > *Base de Datos...* y *Salvar*.
+2. Clic derecho en la base `actas` > *Query Tool* (en español, *Herramienta de Consulta*).
+   Abre `db/init/01_esquema.sql` con el ícono de carpeta (Ctrl+O) y ejecútalo con F5.
+   Haz lo mismo con `db/init/02_datos_demo.sql` y después con cada archivo `.sql` de `db/migraciones/`, en cualquier orden.
+   En una base nueva las migraciones no cambian nada y en *Messages* (*Mensajes*) salen avisos `NOTICE`
+   que dicen *already exists, skipping*. Es normal.
+3. En la carpeta del proyecto (donde está `app.py`), copia `env.ejemplo` con el nombre `.env`. En la terminal:
+   `copy env.ejemplo .env`. Ábrelo con el Bloc de notas y pon en `DB_PASSWORD` la contraseña que elegiste
+   al instalar PostgreSQL.
+4. Instala las dependencias: `py -m pip install -r requirements.txt`
+5. Ejecuta la app con `py app.py` y abre http://localhost:5000
 
-## Layer 002
+### Camino 2: con Docker Desktop
 
+1. Abre Docker Desktop y espera a que diga *Engine running*. Escribe los comandos siguientes en una terminal
+   abierta en la carpeta del proyecto (donde está `docker-compose.yml`).
+2. Copia `env.ejemplo` con el nombre `.env` (`copy env.ejemplo .env`) y deja los valores tal cual.
+3. Con `docker compose up -d --build` se levantan la base y la app. Abre http://localhost:5000.
+   Si prefieres correr la app en tu máquina, levanta solo la base con `docker compose up -d db`.
+   Después instala las dependencias y ejecuta `py app.py`.
 
-## Opción A: todo con Docker (app + base de datos)
+La primera vez, Docker crea la base con `db/init/` y aplica todo `db/migraciones/`, así que queda lista con tablas y usuarios.
 
-1. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-2. Copiar `.env.example` a `.env`.
-3. `docker compose up -d --build`
-4. Abrir http://localhost:5000
+### Para entrar
 
-## Opción B: app en tu máquina, solo la BD en Docker
+Se entra con el **correo**, no con el documento. Todos los usuarios de prueba tienen la contraseña `Demo12345`.
 
-1. `docker compose up -d db`
-2. `pip install -r requirements.txt`
-3. `python app.py`   (con `DB_HOST=localhost` en tu `.env`)
+| Correo                   | Rol                                                                 |
+| ------------------------ | ------------------------------------------------------------------- |
+| `admin@actas.local`      | Administrador: ve todas las actas, la lista de usuarios y crea actas |
+| `lider@actas.local`      | Instructor líder de la ficha 3210115: crea las actas de esa ficha   |
+| `instructor@actas.local` | Instructor de la ficha 3210115: hace aportes, pero no crea actas    |
 
-Usuario de prueba: documento `123456789`, contraseña `Demo12345`.
+Si quieres tu propio usuario, créalo con `py crear_usuario.py`.
+
+Estos usuarios son solo para desarrollo. Antes de publicar la app en un servidor, bórralos o cámbiales la contraseña.
+
+### Si algo falla
+
+- **"No pudimos conectar con el servidor"**: la app no llega a la base o la base no tiene tablas.
+  - Revisa en `.env` que `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` y `DB_PASSWORD` sean los mismos de pgAdmin.
+  - En pgAdmin, revisa que corriste `01_esquema.sql` dentro de la base `actas`.
+  - En Docker, si ya habías corrido `docker compose up` antes de tener `db/init/`, la base quedó vacía. Corre
+    `docker compose down -v` y luego `docker compose up -d`. Esto borra los datos.
+- **"Correo o contraseña incorrectos"**: la base no tiene ese usuario. Corre `db/init/02_datos_demo.sql`
+  o crea uno con `py crear_usuario.py`.
+- **`KeyError: 'SECRET_KEY'` al arrancar, o `KeyError: 'DB_NAME'` al iniciar sesión**: la app no encuentra el `.env`.
+  - Debe llamarse exactamente `.env` y estar al lado de `app.py`.
+  - Para revisarlo, corre `dir /a` en cmd o `Get-ChildItem -Force` en PowerShell. Debe salir `.env` y no `.env.txt`.
+  - Con Docker, este mismo problema aparece como `env file ...\.env not found` o `The "DB_USER" variable is not set`.
+- **`UnicodeDecodeError: 'utf-8' codec can't decode byte...` (Windows)**: PostgreSQL rechazó la conexión y respondió
+  en español. Casi siempre es que la contraseña de `.env` está mal, que la base `actas` no existe o que `DB_PORT`
+  apunta a otro PostgreSQL. Conéctate en pgAdmin con esos mismos datos para comprobarlo.
+- **Cambié el `.env` y la app o Docker siguen igual (VS Code)**: VS Code carga el `.env` cuando abre la terminal.
+  Cierra esa terminal con el ícono de la papelera, abre una nueva y vuelve a correr el comando.
+- **Docker dice que el puerto 5432 ya está en uso**: ya tienes un PostgreSQL instalado en ese puerto.
+  Pon `DB_PORT=5433` en `.env` y vuelve a correr `docker compose up -d` (en VS Code, desde una terminal nueva).
+- **La base de Docker sale *unhealthy* o le faltan cambios**: alguna migración falló al crearla. Busca `ERROR` en
+  `docker compose logs db`, corrige ese archivo de `db/migraciones/` y crea la base de nuevo con
+  `docker compose down -v` y luego `docker compose up -d`.
+- **Cambié `db/init/` y Docker no lo tomó**: Docker solo corre esos archivos cuando la base está vacía. Para crearla
+  de nuevo, corre `docker compose down -v` y luego `docker compose up -d`. Esto borra los datos.
 
 ## Comandos útiles
 
 - Ver estado:       `docker compose ps`
 - Ver logs:         `docker compose logs -f web`
 - Apagar:           `docker compose down`
-- Reiniciar la BD desde cero (borra datos y re-ejecuta `db/init/`):
-                    `docker compose down -v && docker compose up -d`
-- Reconstruir la app tras cambiar el código o requirements:
-                    `docker compose up -d --build`
+- Reiniciar la BD desde cero (borra los datos y vuelve a correr `db/init/` y `db/migraciones/`):
+  primero `docker compose down -v` y luego `docker compose up -d`
+- Reconstruir la app después de cambiar el código o `requirements.txt`: `docker compose up -d --build`
 
+## Cambiar la estructura de la BD
+
+Agrega un archivo en `db/migraciones/` que se pueda correr más de una vez (`ADD COLUMN IF NOT EXISTS`,
+`CREATE TABLE IF NOT EXISTS`) y súbelo a Git.
+
+- Quien ya tiene la base en pgAdmin corre ese archivo allí.
+- Quien ya tiene la base en Docker lo aplica sin borrar datos con
+  `docker compose exec db psql -U postgres -d actas -f /migraciones/NOMBRE_DEL_ARCHIVO.sql`
+  (cambia `postgres` y `actas` si pusiste otros valores en `DB_USER` y `DB_NAME`).
+- Docker lo aplica solo cuando crea una base nueva.
+- No corras `01_esquema.sql` sobre una base que ya tiene tablas.
+
+## Layer 002
+
+Docker: ver "Camino 2" arriba.
 
 ##Layer_003
 
