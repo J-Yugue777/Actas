@@ -1,0 +1,2 @@
+# Los scripts de shell que corre Docker deben quedar con fin de línea LF también en Windows
+*.sh text eol=lf

@@ -12,6 +12,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data            # datos reales (NO van a Git)
       - ./db/init:/docker-entrypoint-initdb.d:ro   # tablas y datos (SÍ van a Git)
+      - ./db/migraciones:/migraciones:ro           # 03_migraciones.sh las aplica al crear la base
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
@@ -19,7 +20,9 @@ services:
       retries: 10
 
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: dockerfile   # el archivo se llama en minúscula
     container_name: proyecto_web
     restart: unless-stopped
     env_file: .env
