@@ -13,16 +13,16 @@
     <div><p class="dato-titulo">Total de actas</p><p class="dato-valor verde">{{ total }}</p></div>
   </article>
   <article class="dato">
-    <span class="dato-icono azul">{{ icono('folder') }}</span>
-    <div><p class="dato-titulo">Abiertas</p><p class="dato-valor azul">{{ abiertas }}</p></div>
-  </article>
-  <article class="dato">
-    <span class="dato-icono amarillo">{{ icono('clipboard') }}</span>
-    <div><p class="dato-titulo">Cerradas</p><p class="dato-valor">{{ total - abiertas }}</p></div>
+    <span class="dato-icono azul">{{ icono('calendar') }}</span>
+    <div><p class="dato-titulo">Actas en {{ anio }}</p><p class="dato-valor azul">{{ este_anio }}</p></div>
   </article>
   <article class="dato">
     <span class="dato-icono morado">{{ icono('users') }}</span>
-    <div><p class="dato-titulo">Participantes</p><p class="dato-valor">{{ participantes }}</p></div>
+    <div><p class="dato-titulo">Asistentes registrados</p><p class="dato-valor">{{ asistentes }}</p></div>
+  </article>
+  <article class="dato">
+    <span class="dato-icono amarillo">{{ icono('clipboard') }}</span>
+    <div><p class="dato-titulo">Compromisos</p><p class="dato-valor">{{ compromisos }}</p></div>
   </article>
 </section>
 
@@ -45,14 +45,14 @@
   </section>
 
   <section class="panel">
-    <header class="panel-cab"><h2>Actas por centro de formación</h2></header>
-    {% if por_centro %}
+    <header class="panel-cab"><h2>Actas por dirección regional</h2></header>
+    {% if por_regional %}
     <div class="tabla-scroll">
       <table>
-        <thead><tr><th>Centro</th><th>Actas</th></tr></thead>
+        <thead><tr><th>Regional</th><th>Actas</th></tr></thead>
         <tbody>
-          {% for c in por_centro %}
-          <tr><td class="fuerte">{{ c.centro }}</td><td>{{ c.n }}</td></tr>
+          {% for c in por_regional %}
+          <tr><td class="fuerte">{{ c.regional }}</td><td>{{ c.n }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

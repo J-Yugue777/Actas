@@ -2,12 +2,11 @@
 Secciones del menú lateral: Mis actas, Asistentes, Compromisos, Usuarios,
 Reportes y Configuración (cambiar contraseña).
 
-Las plantillas llaman a estas rutas sin prefijo (url_for('mis_actas'), etc.),
-por eso se registran con `secciones.registrar(app)` y no como blueprint.
+Leen la tabla `actas` del modelo GOR-F084 V2 (actas.py): cada acta es una fila y sus
+asistentes y compromisos viven como arreglos JSON dentro de ella.
 
 Alcance de los datos:
-- Mis actas, Asistentes y Compromisos: solo las actas que la persona lidera o
-  en las que participa.
+- Mis actas, Asistentes y Compromisos: solo las actas que creó la persona.
 - Reportes: todo el sistema para Administrador y Coordinador académico;
   para los demás, solo sus propias actas.
 - Usuarios: solo Administrador.
@@ -20,25 +19,26 @@ from flask import (abort, current_app, flash, redirect, render_template,
                    request, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from actas import MESES, ROLES_TODAS_LAS_FICHAS, login_requerido, transaccion
+from seguridad import ROLES_ACCESO_GLOBAL, login_requerido, puede_crear_acta
+from db import transaccion
 
 ROL_ADMIN = "Administrador"
-ESTADOS_ACTA = ("abierta", "cerrada")
-FILTROS_COMPROMISO = ("todos", "pendiente", "completado")
+FILTROS_COMPROMISO = ("todos", "vigente", "vencido")
 MIN_PASSWORD = 8
+MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
+         "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
 
-# Actas a las que la persona tiene acceso: las que lidera o en las que participa
-ACTAS_DE_LA_PERSONA = """
-    SELECT id FROM actas WHERE lider_id = %(u)s
-    UNION
-    SELECT acta_id FROM acta_participantes WHERE usuario_id = %(u)s
-"""
+
+def _arreglo(columna):
+    """Expresión SQL que devuelve la columna JSON como arreglo (o [] si no lo es)."""
+    return (f"(CASE WHEN jsonb_typeof(a.{columna}) = 'array' "
+            f"THEN a.{columna} ELSE '[]'::jsonb END)")
 
 
 # ----------------------------------------------------------------- utilidades
 @contextmanager
 def consulta():
-    """Cursor de solo uso interno: si la base falla, responde 503 y deja el error en el log."""
+    """Cursor de uso interno: si la base falla, responde 503 y deja el error en el log."""
     try:
         with transaccion() as cur:
             yield cur
@@ -60,34 +60,25 @@ def _texto_busqueda():
 # ------------------------------------------------------------------ Mis actas
 def mis_actas():
     q = _texto_busqueda()
-    estado = request.args.get("estado", "")
-    if estado not in ESTADOS_ACTA:
-        estado = ""
-
-    condiciones = [f"a.id IN ({ACTAS_DE_LA_PERSONA})"]
+    condiciones = ["a.creado_por = %(u)s"]
     params = {"u": session["usuario_id"]}
     if q:
-        condiciones.append("(a.nombre_reunion ILIKE %(pat)s OR a.numero_acta ILIKE %(pat)s)")
+        condiciones.append("(a.nombre_comite ILIKE %(pat)s OR a.ciudad ILIKE %(pat)s)")
         params["pat"] = _patron(q)
-    if estado:
-        condiciones.append("a.estado = %(estado)s")
-        params["estado"] = estado
 
     with consulta() as cur:
         cur.execute(
             f"""
-            SELECT a.id, a.numero_acta, a.nombre_reunion, a.fecha_reunion,
-                   a.tipo_acta, a.estado, f.numero AS ficha
+            SELECT a.id, a.nombre_comite, a.ciudad, a.fecha, a.direccion_regional
             FROM actas a
-            LEFT JOIN fichas f ON f.id = a.ficha_id
             WHERE {' AND '.join(condiciones)}
-            ORDER BY a.fecha_reunion DESC, a.id DESC
+            ORDER BY a.fecha DESC NULLS LAST, a.id DESC
             LIMIT 200
             """,
             params,
         )
         actas = cur.fetchall()
-    return render_template("mis_actas.html", actas=actas, q=q, estado=estado)
+    return render_template("mis_actas.html", actas=actas, q=q)
 
 
 # ----------------------------------------------------------------- Asistentes
@@ -96,45 +87,51 @@ def asistentes():
     filtro = ""
     params = {"u": session["usuario_id"]}
     if q:
-        filtro = ("AND (u.nombre ILIKE %(pat)s OR u.apellido ILIKE %(pat)s "
-                  "OR u.correo ILIKE %(pat)s OR (u.nombre || ' ' || u.apellido) ILIKE %(pat)s)")
+        filtro = "AND ((x->>'nombre') ILIKE %(pat)s OR (x->>'dependencia') ILIKE %(pat)s)"
         params["pat"] = _patron(q)
 
     with consulta() as cur:
         cur.execute(
             f"""
-            SELECT u.id, u.nombre, u.apellido, u.correo, r.nombre AS rol,
-                   COUNT(*) AS total_actas,
-                   COUNT(*) FILTER (WHERE p.desarrollo IS NOT NULL
-                                       OR p.conclusiones IS NOT NULL) AS aportes
-            FROM acta_participantes p
-            JOIN usuarios u ON u.id = p.usuario_id
-            JOIN roles r ON r.id = u.rol_id
-            WHERE p.acta_id IN ({ACTAS_DE_LA_PERSONA}) {filtro}
-            GROUP BY u.id, r.nombre
-            ORDER BY u.apellido, u.nombre
+            SELECT MIN(TRIM(x->>'nombre')) AS nombre,
+                   MAX(NULLIF(TRIM(x->>'dependencia'), '')) AS dependencia,
+                   COUNT(DISTINCT a.id) AS total_actas,
+                   COUNT(DISTINCT a.id) FILTER (WHERE x->>'aprueba' = 'si') AS aprobadas
+            FROM actas a, jsonb_array_elements({_arreglo('asistentes')}) x
+            WHERE a.creado_por = %(u)s
+              AND TRIM(COALESCE(x->>'nombre', '')) <> '' {filtro}
+            GROUP BY LOWER(TRIM(x->>'nombre'))
+            ORDER BY 1
             """,
             params,
         )
         lista = cur.fetchall()
 
-    con_aporte = sum(1 for p in lista if p["aportes"] == p["total_actas"])
-    return render_template("asistentes.html", asistentes=lista, con_aporte=con_aporte, q=q)
+    aprueban_todo = sum(1 for p in lista if p["aprobadas"] == p["total_actas"])
+    return render_template("asistentes.html", asistentes=lista, aprueban_todo=aprueban_todo, q=q)
 
 
 # ---------------------------------------------------------------- Compromisos
-def _compromiso_para_plantilla(fila):
-    hecho = fila["completado"]
+def _compromiso_para_plantilla(fila, hoy):
+    try:
+        limite = date.fromisoformat(fila["fecha"]) if fila["fecha"] else None
+    except ValueError:
+        limite = None
+
+    if limite is None:
+        estado, clase, icono, color, vencido = "Sin fecha", "gris", "clipboard", "amarillo", False
+    elif limite < hoy:
+        estado, clase, icono, color, vencido = "Vencido", "rojo", "clock", "rojo", True
+    else:
+        estado, clase, icono, color, vencido = "Vigente", "azul", "clock", "azul", False
+
     return {
         "titulo": fila["actividad"],
-        "acta": fila["consecutivo"],
+        "acta": fila["acta_id"],
         "responsable": fila["responsable"] or "Sin asignar",
-        "fecha": fila["fecha_entrega"].strftime("%d/%m/%Y"),
-        "estado": "Completado" if hecho else "Pendiente",
-        "clase": "verde" if hecho else "amarillo",
-        "icono": "check-circle" if hecho else "clock",
-        "color": "verde" if hecho else "amarillo",
-        "hecho": hecho,
+        "fecha": limite.strftime("%d/%m/%Y") if limite else "—",
+        "estado": estado, "clase": clase, "icono": icono, "color": color,
+        "vencido": vencido,
     }
 
 
@@ -146,27 +143,29 @@ def compromisos():
     with consulta() as cur:
         cur.execute(
             f"""
-            SELECT c.actividad, c.fecha_entrega, c.completado, a.consecutivo,
-                   COALESCE(ur.nombre || ' ' || ur.apellido, c.responsable_texto) AS responsable
-            FROM acta_compromisos c
-            JOIN actas a ON a.id = c.acta_id
-            LEFT JOIN usuarios ur ON ur.id = c.responsable_id
-            WHERE c.acta_id IN ({ACTAS_DE_LA_PERSONA})
-            ORDER BY c.completado, c.fecha_entrega
+            SELECT a.id AS acta_id,
+                   TRIM(c->>'actividad') AS actividad,
+                   NULLIF(TRIM(c->>'fecha'), '') AS fecha,
+                   NULLIF(TRIM(c->>'responsable'), '') AS responsable
+            FROM actas a, jsonb_array_elements({_arreglo('compromisos')}) c
+            WHERE a.creado_por = %(u)s
+              AND TRIM(COALESCE(c->>'actividad', '')) <> ''
+            ORDER BY fecha NULLS LAST, a.id
             """,
             {"u": session["usuario_id"]},
         )
-        todos = [_compromiso_para_plantilla(f) for f in cur.fetchall()]
+        hoy = date.today()
+        todos = [_compromiso_para_plantilla(f, hoy) for f in cur.fetchall()]
 
     conteos = {
         "todos": len(todos),
-        "pendiente": sum(1 for c in todos if not c["hecho"]),
-        "completado": sum(1 for c in todos if c["hecho"]),
+        "vigente": sum(1 for c in todos if not c["vencido"]),
+        "vencido": sum(1 for c in todos if c["vencido"]),
     }
-    if filtro == "pendiente":
-        todos = [c for c in todos if not c["hecho"]]
-    elif filtro == "completado":
-        todos = [c for c in todos if c["hecho"]]
+    if filtro == "vigente":
+        todos = [c for c in todos if not c["vencido"]]
+    elif filtro == "vencido":
+        todos = [c for c in todos if c["vencido"]]
     return render_template("compromisos.html", compromisos=todos, conteos=conteos, filtro=filtro)
 
 
@@ -210,14 +209,16 @@ def usuarios():
 def reportes():
     anio = date.today().year
     params = {"u": session["usuario_id"], "anio": anio}
-    todo_el_sistema = session.get("rol") in ROLES_TODAS_LAS_FICHAS
-    alcance = "TRUE" if todo_el_sistema else f"a.id IN ({ACTAS_DE_LA_PERSONA})"
+    todo_el_sistema = session.get("rol") in ROLES_ACCESO_GLOBAL
+    alcance = "TRUE" if todo_el_sistema else "a.creado_por = %(u)s"
 
     with consulta() as cur:
         cur.execute(
             f"""
             SELECT COUNT(*) AS total,
-                   COUNT(*) FILTER (WHERE a.estado = 'abierta') AS abiertas
+                   COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM a.fecha) = %(anio)s) AS este_anio,
+                   COALESCE(SUM(jsonb_array_length({_arreglo('asistentes')})), 0) AS asistentes,
+                   COALESCE(SUM(jsonb_array_length({_arreglo('compromisos')})), 0) AS compromisos
             FROM actas a WHERE {alcance}
             """,
             params,
@@ -226,20 +227,9 @@ def reportes():
 
         cur.execute(
             f"""
-            SELECT COUNT(DISTINCT p.usuario_id) AS n
-            FROM acta_participantes p
-            JOIN actas a ON a.id = p.acta_id
-            WHERE {alcance}
-            """,
-            params,
-        )
-        participantes = cur.fetchone()["n"]
-
-        cur.execute(
-            f"""
-            SELECT EXTRACT(MONTH FROM a.fecha_reunion)::int AS mes, COUNT(*) AS n
+            SELECT EXTRACT(MONTH FROM a.fecha)::int AS mes, COUNT(*) AS n
             FROM actas a
-            WHERE {alcance} AND a.anio = %(anio)s
+            WHERE {alcance} AND EXTRACT(YEAR FROM a.fecha) = %(anio)s
             GROUP BY 1
             """,
             params,
@@ -248,24 +238,25 @@ def reportes():
 
         cur.execute(
             f"""
-            SELECT c.nombre AS centro, COUNT(*) AS n
+            SELECT COALESCE(NULLIF(TRIM(a.direccion_regional), ''), 'Sin regional') AS regional,
+                   COUNT(*) AS n
             FROM actas a
-            JOIN centros_formacion c ON c.id = a.centro_id
             WHERE {alcance}
-            GROUP BY c.nombre
-            ORDER BY n DESC, c.nombre
+            GROUP BY 1
+            ORDER BY n DESC, 1
             LIMIT 10
             """,
             params,
         )
-        por_centro = cur.fetchall()
+        por_regional = cur.fetchall()
 
     por_mes = [{"mes": nombre[:3], "n": por_mes_bd.get(i, 0)} for i, nombre in enumerate(MESES, start=1)]
     return render_template(
         "reportes.html",
-        total=resumen["total"], abiertas=resumen["abiertas"], participantes=participantes,
+        total=resumen["total"], este_anio=resumen["este_anio"],
+        asistentes=resumen["asistentes"], compromisos=resumen["compromisos"],
         anio=anio, por_mes=por_mes, maximo=max(1, *(m["n"] for m in por_mes)),
-        por_centro=por_centro,
+        por_regional=por_regional,
     )
 
 
@@ -338,6 +329,11 @@ def registrar(app):
                          view_func=login_requerido(vista), methods=metodos)
 
     @app.context_processor
-    def inyectar_rol():
-        # Para mostrar "Usuarios" en el menú solo a quien puede entrar
-        return {"es_admin": session.get("rol") == ROL_ADMIN}
+    def inyectar_menu():
+        # Para mostrar "Usuarios" y "Crear acta" en el menú solo a quien puede usarlos
+        if "usuario_id" not in session:
+            return {}
+        return {
+            "es_admin": session.get("rol") == ROL_ADMIN,
+            "puede_crear_acta": puede_crear_acta(session["usuario_id"]),
+        }

@@ -5,7 +5,7 @@
 
 {% block contenido %}
 <h1>Asistentes</h1>
-<p class="sub">Personas que han participado en tus actas y su nivel de aporte.</p>
+<p class="sub">Personas registradas como asistentes en tus actas y si aprobaron las decisiones.</p>
 
 <section class="resumen resumen-3" aria-label="Resumen">
   <article class="dato">
@@ -14,18 +14,18 @@
   </article>
   <article class="dato">
     <span class="dato-icono verde">{{ icono('check-circle') }}</span>
-    <div><p class="dato-titulo">Con aporte registrado</p><p class="dato-valor verde">{{ con_aporte }}</p></div>
+    <div><p class="dato-titulo">Aprueban siempre</p><p class="dato-valor verde">{{ aprueban_todo }}</p></div>
   </article>
   <article class="dato">
     <span class="dato-icono amarillo">{{ icono('clock') }}</span>
-    <div><p class="dato-titulo">Pendientes</p><p class="dato-valor amarillo">{{ asistentes|length - con_aporte }}</p></div>
+    <div><p class="dato-titulo">Con alguna no aprobada</p><p class="dato-valor amarillo">{{ asistentes|length - aprueban_todo }}</p></div>
   </article>
 </section>
 
 <form class="barra-filtros" method="get" action="{{ url_for('asistentes') }}">
   <div class="campo buscador">
     <label for="q" class="sr-only">Buscar</label>
-    <input type="search" id="q" name="q" value="{{ q }}" placeholder="Buscar por nombre o correo">
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="Buscar por nombre o dependencia">
   </div>
   <button type="submit" class="btn-sec btn-filtrar">Buscar</button>
 </form>
@@ -35,27 +35,26 @@
   {% if asistentes %}
   <div class="tabla-scroll">
     <table>
-      <thead><tr><th>Nombre</th><th>Rol</th><th>Correo</th><th>Actas</th><th>Aportes</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Dependencia / empresa</th><th>Actas</th><th>Aprobó</th></tr></thead>
       <tbody>
         {% for p in asistentes %}
         <tr>
           <td>
             <span class="persona">
-              <span class="avatar avatar-sm">{{ (p.nombre[:1] ~ p.apellido[:1])|upper }}</span>
-              <span class="fuerte">{{ p.nombre }} {{ p.apellido }}</span>
+              <span class="avatar avatar-sm">{{ (p.nombre.split()[0][:1] ~ (p.nombre.split()[-1][:1] if p.nombre.split()|length > 1 else ''))|upper }}</span>
+              <span class="fuerte">{{ p.nombre }}</span>
             </span>
           </td>
-          <td>{{ p.rol }}</td>
-          <td>{{ p.correo }}</td>
+          <td>{{ p.dependencia or '—' }}</td>
           <td>{{ p.total_actas }}</td>
-          <td><span class="insignia {{ 'verde' if p.aportes == p.total_actas else 'amarillo' }}">{{ p.aportes }} / {{ p.total_actas }}</span></td>
+          <td><span class="insignia {{ 'verde' if p.aprobadas == p.total_actas else 'amarillo' }}">{{ p.aprobadas }} / {{ p.total_actas }}</span></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% else %}
-  <div class="vacio"><p class="fuerte">Aún no hay asistentes.</p><p class="sub">Aparecerán cuando tus actas tengan participantes.</p></div>
+  <div class="vacio"><p class="fuerte">Aún no hay asistentes.</p><p class="sub">Aparecerán cuando tus actas tengan asistentes registrados.</p></div>
   {% endif %}
 </section>
 {% endblock %}

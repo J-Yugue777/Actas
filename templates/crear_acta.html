@@ -1,231 +1,342 @@
-{% extends 'base_app.html' %}
-{% set menu_activo = 'crear' %}
-{% block titulo %}Crear acta | Actas SENA{% endblock %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Acta GOR-F084 V2</title>
+</head>
+<body>
+<h1>Acta de reunión GOR-F084 V2</h1>
 
-{% block contenido %}
-<h1>Crear acta</h1>
-<p class="sub">Registra los datos generales. Al guardar, el acta queda abierta para que los participantes hagan sus aportes.</p>
+<form id="formActa">
 
-{% if errores %}
-<div class="alerta alerta-lista" role="alert">
-  <strong>Revisa lo siguiente:</strong>
-  <ul>{% for e in errores %}<li>{{ e }}</li>{% endfor %}</ul>
-</div>
-{% endif %}
+  <p><label>Nombre del comité o de la reunión:<br>
+    <input type="text" id="nombre_comite" required></label></p>
 
-<form class="acta-form" method="post" action="{{ url_for('actas.crear') }}">
+  <p><label>Ciudad:<br>
+    <input type="text" id="ciudad" required></label></p>
 
-  <section class="panel panel-formulario">
-    <header class="panel-cab"><h2>Tipo de acta</h2></header>
-    <div class="opciones-tipo">
-      {% if puede_equipo %}
-      <label class="opcion">
-        <input type="radio" name="tipo_acta" value="equipo_ejecutor" {{ 'checked' if datos.tipo_acta == 'equipo_ejecutor' }}>
-        <span><strong>Equipo ejecutor</strong><small>Acta mensual de una ficha</small></span>
-      </label>
-      {% endif %}
-      <label class="opcion">
-        <input type="radio" name="tipo_acta" value="otros_asuntos" {{ 'checked' if datos.tipo_acta == 'otros_asuntos' }}>
-        <span><strong>Otros asuntos</strong><small>Reunión que no es de una ficha</small></span>
-      </label>
-    </div>
+  <p><label>Fecha:<br>
+    <input type="date" id="fecha" required></label></p>
 
-    {% if puede_equipo %}
-    <div class="rejilla" id="bloque-equipo">
-      <div class="campo">
-        <label for="ficha_id">Ficha</label>
-        <select id="ficha_id" name="ficha_id">
-          <option value="">Selecciona la ficha…</option>
-          {% for f in fichas %}
-          <option value="{{ f.id }}" {{ 'selected' if datos.ficha_id == f.id|string }}>{{ f.numero }} — {{ f.programa }}</option>
-          {% endfor %}
-        </select>
-        <small class="ayuda">Solo aparecen las fichas en las que puedes crear actas.</small>
-      </div>
-      <div class="campo">
-        <label for="mes">Mes del acta</label>
-        <select id="mes" name="mes">
-          <option value="">Selecciona el mes…</option>
-          {% for m in meses %}
-          <option value="{{ loop.index }}" {{ 'selected' if datos.mes == loop.index|string }}>{{ m }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-    {% endif %}
-  </section>
+  <p><label>Hora inicio:<br>
+    <input type="time" id="hora_inicio" required></label></p>
 
-  <section class="panel panel-formulario">
-    <header class="panel-cab"><h2>Datos generales</h2></header>
-    <p class="nota-numero">El número de acta se asigna automáticamente al guardar (consecutivo por centro, ficha y año).</p>
+  <p><label>Hora fin:<br>
+    <input type="time" id="hora_fin" required></label></p>
 
-    <div class="rejilla">
-      <div class="campo completo">
-        <label for="nombre_reunion">Nombre de la reunión</label>
-        <input type="text" id="nombre_reunion" name="nombre_reunion" value="{{ datos.nombre_reunion }}" maxlength="200" required>
-      </div>
+  <p><label>Lugar y/o enlace:<br>
+    <input type="text" id="lugar_enlace" required></label></p>
 
-      <div class="campo">
-        <label for="ciudad">Ciudad</label>
-        <input type="text" id="ciudad" name="ciudad" value="{{ datos.ciudad }}" maxlength="100" placeholder="Ej.: Palmira" required>
-      </div>
-      <div class="campo">
-        <label for="fecha_reunion">Fecha de la reunión</label>
-        <input type="date" id="fecha_reunion" name="fecha_reunion" value="{{ datos.fecha_reunion }}" required>
-      </div>
+  <p><label>Dirección regional centro:<br>
+    <input type="text" id="direccion_regional" required></label></p>
 
-      <div class="campo">
-        <label for="hora_inicio">Hora de inicio</label>
-        <input type="time" id="hora_inicio" name="hora_inicio" value="{{ datos.hora_inicio }}" required>
-      </div>
-      <div class="campo">
-        <label for="hora_fin">Hora de fin</label>
-        <input type="time" id="hora_fin" name="hora_fin" value="{{ datos.hora_fin }}" required>
-      </div>
+  <p><label>Agenda o puntos para desarrollar:<br>
+    <textarea id="agenda" rows="4" cols="60"></textarea></label></p>
 
-      <div class="campo completo">
-        <label for="lugar_enlace">Lugar o enlace de la reunión</label>
-        <input type="text" id="lugar_enlace" name="lugar_enlace" value="{{ datos.lugar_enlace }}" maxlength="300" placeholder="Sitio físico o enlace de Teams" required>
-      </div>
+  <p><label>Objetivos de la reunión:<br>
+    <textarea id="objetivos_de_reunion" rows="4" cols="60"></textarea></label></p>
 
-      <div class="campo">
-        <label for="regional_id">Dirección regional</label>
-        <select id="regional_id" name="regional_id" required>
-          <option value="">Selecciona la regional…</option>
-          {% for r in regionales %}
-          <option value="{{ r.id }}" {{ 'selected' if datos.regional_id == r.id|string }}>{{ r.nombre }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="campo">
-        <label for="centro_id">Centro de formación</label>
-        <select id="centro_id" name="centro_id" required disabled>
-          <option value="">Primero elige la regional</option>
-        </select>
-      </div>
+  <p><label>Desarrollo de la reunión:<br>
+    <textarea id="desarrollo" rows="6" cols="60"></textarea></label></p>
 
-      <div class="campo">
-        <label for="codigo_formato">Código y versión del formato</label>
-        <input type="text" id="codigo_formato" name="codigo_formato" value="{{ datos.codigo_formato }}" maxlength="30">
-      </div>
-    </div>
-  </section>
+  <p><label>Conclusiones:<br>
+    <textarea id="conclusiones" rows="4" cols="60"></textarea></label></p>
 
-  <section class="panel panel-formulario">
-    <header class="panel-cab"><h2>Agenda y objetivos</h2></header>
+  <h2>Compromisos</h2>
+  <table border="1" id="tablaCompromisos">
+    <thead>
+      <tr>
+        <th>Actividad / decisión</th>
+        <th>Fecha</th>
+        <th>Responsable</th>
+        <th>Firma o participación virtual</th>
+        <th>Quitar</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p><button type="button" id="btnAddCompromiso">Agregar compromiso</button></p>
 
-    <div class="lista-dinamica" data-nombre="agenda" data-placeholder="Punto a desarrollar">
-      <h3>Agenda / puntos a desarrollar</h3>
-      <div class="items">
-        {% for t in (datos.agenda or ['']) %}
-        <div class="item">
-          <input type="text" name="agenda" value="{{ t }}" maxlength="500" placeholder="Punto a desarrollar" aria-label="Punto de la agenda">
-          <button type="button" class="quitar" aria-label="Quitar punto">×</button>
-        </div>
-        {% endfor %}
-      </div>
-      <button type="button" class="agregar">+ Agregar punto</button>
-    </div>
+  <h2>Asistentes y aprobación de decisiones</h2>
+  <table border="1" id="tablaAsistentes">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>Dependencia / empresa</th>
+        <th>Aprueba</th>
+        <th>Observación</th>
+        <th>Firma o participación virtual</th>
+        <th>Quitar</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p><button type="button" id="btnAddAsistente">Agregar asistente</button></p>
 
-    <div class="lista-dinamica" data-nombre="objetivos" data-placeholder="Objetivo de la reunión">
-      <h3>Objetivos de la reunión</h3>
-      <div class="items">
-        {% for t in (datos.objetivos or ['']) %}
-        <div class="item">
-          <input type="text" name="objetivos" value="{{ t }}" maxlength="500" placeholder="Objetivo de la reunión" aria-label="Objetivo de la reunión">
-          <button type="button" class="quitar" aria-label="Quitar objetivo">×</button>
-        </div>
-        {% endfor %}
-      </div>
-      <button type="button" class="agregar">+ Agregar objetivo</button>
-    </div>
-  </section>
+  <h2>Anexos</h2>
+  <p><label>Capturas de pantalla (imágenes):<br>
+    <input type="file" id="anexos" accept="image/*" multiple></label></p>
 
-  <div class="acciones acciones-form">
-    <a class="btn-sec" href="{{ url_for('inicio') }}">Cancelar</a>
-    <button type="submit" class="btn-primario">Guardar y abrir acta</button>
-  </div>
+  <p>
+    <button type="button" id="btnGuardar">Guardar borrador</button>
+    <button type="button" id="btnCargar">Cargar borrador</button>
+    <button type="submit" id="btnEnviar">Enviar</button>
+  </p>
+  <p id="mensaje"></p>
 </form>
-{% endblock %}
 
-{% block scripts %}
+<h2>Descargas</h2>
+<div id="descargas">
+  <p>Cuando envíes el acta, aquí aparecerán el PDF y los anexos para descargar.</p>
+</div>
+
 <script>
-  const CENTROS = {{ centros|tojson }};
-  const CENTRO_ELEGIDO = {{ (datos.centro_id or '')|tojson }};
+const CLAVE_BORRADOR = "acta_gorf084_v2_borrador";
+const URL_ENVIO = "/api/actas";
 
-  // Centros dependientes de la regional
-  const selRegional = document.getElementById('regional_id');
-  const selCentro = document.getElementById('centro_id');
+// ---------- Utilidades de tipos ----------
+function texto(valor) {
+  return String(valor === undefined || valor === null ? "" : valor).trim();
+}
+function fechaValida(valor) {
+  // input type=date entrega AAAA-MM-DD
+  return /^\d{4}-\d{2}-\d{2}$/.test(valor) && !Number.isNaN(Date.parse(valor)) ? valor : "";
+}
+function horaValida(valor) {
+  // input type=time entrega HH:MM (24 horas)
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) ? valor : "";
+}
+function normalizarHora(valor) {
+  // Convierte borradores viejos: 21 -> "21:00". Deja pasar "21:30".
+  if (valor === null || valor === undefined || valor === "") return "";
+  const t = String(valor).trim();
+  if (/^\d{1,2}$/.test(t)) return horaValida(t.padStart(2, "0") + ":00");
+  return horaValida(t.slice(0, 5));
+}
+function mostrar(msg) {
+  document.getElementById("mensaje").textContent = msg;
+}
 
-  function llenarCentros(preseleccion) {
-    selCentro.innerHTML = '';
-    const vacio = document.createElement('option');
-    vacio.value = '';
-    vacio.textContent = selRegional.value ? 'Selecciona el centro…' : 'Primero elige la regional';
-    selCentro.appendChild(vacio);
+// ---------- Filas dinámicas ----------
+function agregarCompromiso(d) {
+  d = d || {};
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input type="text" class="c_actividad"></td>' +
+    '<td><input type="date" class="c_fecha"></td>' +
+    '<td><input type="text" class="c_responsable"></td>' +
+    '<td><input type="text" class="c_firma"></td>' +
+    '<td><button type="button" class="quitar">X</button></td>';
+  tr.querySelector(".c_actividad").value = d.actividad || "";
+  tr.querySelector(".c_fecha").value = d.fecha || "";
+  tr.querySelector(".c_responsable").value = d.responsable || "";
+  tr.querySelector(".c_firma").value = d.firma || "";
+  tr.querySelector(".quitar").onclick = () => tr.remove();
+  document.querySelector("#tablaCompromisos tbody").appendChild(tr);
+}
 
-    CENTROS.filter(c => String(c.regional_id) === selRegional.value).forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.id;
-      o.textContent = c.nombre;
-      if (String(c.id) === String(preseleccion)) o.selected = true;
-      selCentro.appendChild(o);
+function agregarAsistente(d) {
+  d = d || {};
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input type="text" class="a_nombre"></td>' +
+    '<td><input type="text" class="a_dependencia"></td>' +
+    '<td><select class="a_aprueba"><option value="si">Sí</option><option value="no">No</option></select></td>' +
+    '<td><input type="text" class="a_observacion"></td>' +
+    '<td><input type="text" class="a_firma"></td>' +
+    '<td><button type="button" class="quitar">X</button></td>';
+  tr.querySelector(".a_nombre").value = d.nombre || "";
+  tr.querySelector(".a_dependencia").value = d.dependencia || "";
+  tr.querySelector(".a_aprueba").value = d.aprueba || "si";
+  tr.querySelector(".a_observacion").value = d.observacion || "";
+  tr.querySelector(".a_firma").value = d.firma || "";
+  tr.querySelector(".quitar").onclick = () => tr.remove();
+  document.querySelector("#tablaAsistentes tbody").appendChild(tr);
+}
+
+// ---------- Lectura de imágenes (base64) ----------
+function leerArchivo(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve({
+      nombre: file.name,
+      tipo: file.type,
+      base64: String(r.result).split(",")[1]  // sin el prefijo "data:...;base64,"
     });
-    selCentro.disabled = !selRegional.value;
-  }
-  selRegional.addEventListener('change', () => llenarCentros(''));
-  llenarCentros(CENTRO_ELEGIDO);
-
-  // Mostrar ficha y mes solo en actas de equipo ejecutor
-  const bloqueEquipo = document.getElementById('bloque-equipo');
-  function actualizarTipo() {
-    if (!bloqueEquipo) return;
-    const marcado = document.querySelector('input[name="tipo_acta"]:checked');
-    bloqueEquipo.hidden = !(marcado && marcado.value === 'equipo_ejecutor');
-  }
-  document.querySelectorAll('input[name="tipo_acta"]').forEach(r => r.addEventListener('change', actualizarTipo));
-  actualizarTipo();
-
-  // El mes se propone según la fecha, mientras la persona no lo cambie
-  const selMes = document.getElementById('mes');
-  const campoFecha = document.getElementById('fecha_reunion');
-  let mesManual = selMes && selMes.value !== '';
-  if (selMes) selMes.addEventListener('change', () => { mesManual = true; });
-  campoFecha.addEventListener('change', () => {
-    if (!selMes || mesManual || !campoFecha.value) return;
-    selMes.value = String(parseInt(campoFecha.value.split('-')[1], 10));
+    r.onerror = () => reject(new Error("No se pudo leer " + file.name));
+    r.readAsDataURL(file);
   });
+}
 
-  // Listas con puntos que se pueden agregar y quitar
-  document.querySelectorAll('.lista-dinamica').forEach(lista => {
-    const contenedor = lista.querySelector('.items');
-    const nombre = lista.dataset.nombre;
+// ---------- Recolectar datos del formulario ----------
+function recolectarSinAnexos() {
+  const compromisos = [...document.querySelectorAll("#tablaCompromisos tbody tr")];
+  const asistentes = [...document.querySelectorAll("#tablaAsistentes tbody tr")];
+  const val = (tr, c) => texto(tr.querySelector(c).value);
 
-    function nuevoItem() {
-      const fila = document.createElement('div');
-      fila.className = 'item';
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = nombre;
-      input.maxLength = 500;
-      input.placeholder = lista.dataset.placeholder;
-      const quitar = document.createElement('button');
-      quitar.type = 'button';
-      quitar.className = 'quitar';
-      quitar.textContent = '×';
-      quitar.setAttribute('aria-label', 'Quitar');
-      fila.append(input, quitar);
-      contenedor.appendChild(fila);
-      input.focus();
-    }
+  const aprueban = asistentes.map(tr => val(tr, ".a_aprueba"));
+  let aprobacion = "Sin asistentes registrados";
+  if (aprueban.length > 0) {
+    aprobacion = aprueban.every(x => x === "si") ? "Aprobadas por todos" : "Hay asistentes que no aprueban";
+  }
 
-    lista.querySelector('.agregar').addEventListener('click', nuevoItem);
-    lista.addEventListener('click', e => {
-      if (!e.target.classList.contains('quitar')) return;
-      const filas = contenedor.querySelectorAll('.item');
-      if (filas.length === 1) { filas[0].querySelector('input').value = ''; return; }
-      e.target.closest('.item').remove();
+  return {
+    Nombre_comite: texto(document.getElementById("nombre_comite").value),
+    ciudad: texto(document.getElementById("ciudad").value),
+    fecha: fechaValida(document.getElementById("fecha").value),
+    hora_inicio: horaValida(document.getElementById("hora_inicio").value),
+    hora_fin: horaValida(document.getElementById("hora_fin").value),
+    lugar_enlace: texto(document.getElementById("lugar_enlace").value),
+    direccion_regional: texto(document.getElementById("direccion_regional").value),
+    agenda: texto(document.getElementById("agenda").value),
+    objetivos_de_reunion: texto(document.getElementById("objetivos_de_reunion").value),
+    desarrollo: texto(document.getElementById("desarrollo").value),
+    conclusiones: texto(document.getElementById("conclusiones").value),
+
+    compromisos_actividad_decision: compromisos.map(tr => val(tr, ".c_actividad")),
+    compromiso_fechas: compromisos.map(tr => fechaValida(val(tr, ".c_fecha"))),
+    compromisos_responsables: compromisos.map(tr => val(tr, ".c_responsable")),
+    compromiso_firma_participacionVirtual: compromisos.map(tr => val(tr, ".c_firma")),
+
+    aprobacion_decisiones: aprobacion,
+    AD_nombre: asistentes.map(tr => val(tr, ".a_nombre")),
+    AD_dependencia_empresa: asistentes.map(tr => val(tr, ".a_dependencia")),
+    AD_aprueba: aprueban,
+    AD_observaciones: asistentes.map(tr => val(tr, ".a_observacion")),
+    AD_firma_ParticipacionVirtual: asistentes.map(tr => val(tr, ".a_firma"))
+  };
+}
+
+// ---------- Validación ----------
+function validar(d) {
+  if (!d.Nombre_comite) return "Falta el nombre del comité o reunión.";
+  if (!d.ciudad) return "Falta la ciudad.";
+  if (!d.fecha) return "La fecha no es válida.";
+  if (!d.hora_inicio) return "Hora de inicio inválida (formato HH:MM).";
+  if (!d.hora_fin) return "Hora de fin inválida (formato HH:MM).";
+  // "HH:MM" en 24 horas se puede comparar directamente como texto
+  if (d.hora_fin < d.hora_inicio) return "La hora fin no puede ser menor que la hora inicio.";
+  return "";
+}
+
+// ---------- Guardar / cargar borrador (localStorage) ----------
+function guardarBorrador() {
+  try {
+    const d = recolectarSinAnexos(); // las imágenes no se guardan en el borrador
+    localStorage.setItem(CLAVE_BORRADOR, JSON.stringify(d));
+    mostrar("Borrador guardado (sin anexos).");
+  } catch (e) {
+    mostrar("No se pudo guardar el borrador: " + e.message);
+  }
+}
+
+function cargarBorrador() {
+  let d;
+  try {
+    d = JSON.parse(localStorage.getItem(CLAVE_BORRADOR));
+  } catch (e) { d = null; }
+  if (!d) { mostrar("No hay borrador guardado."); return; }
+
+  document.getElementById("nombre_comite").value = d.Nombre_comite || "";
+  document.getElementById("ciudad").value = d.ciudad || "";
+  document.getElementById("fecha").value = d.fecha || "";
+  document.getElementById("hora_inicio").value = normalizarHora(d.hora_inicio);
+  document.getElementById("hora_fin").value = normalizarHora(d.hora_fin);
+  document.getElementById("lugar_enlace").value = d.lugar_enlace || "";
+  document.getElementById("direccion_regional").value = d.direccion_regional || "";
+  document.getElementById("agenda").value = d.agenda || "";
+  document.getElementById("objetivos_de_reunion").value = d.objetivos_de_reunion || "";
+  document.getElementById("desarrollo").value = d.desarrollo || "";
+  document.getElementById("conclusiones").value = d.conclusiones || "";
+
+  document.querySelector("#tablaCompromisos tbody").innerHTML = "";
+  (d.compromisos_actividad_decision || []).forEach((_, i) => agregarCompromiso({
+    actividad: d.compromisos_actividad_decision[i],
+    fecha: d.compromiso_fechas[i],
+    responsable: d.compromisos_responsables[i],
+    firma: d.compromiso_firma_participacionVirtual[i]
+  }));
+
+  document.querySelector("#tablaAsistentes tbody").innerHTML = "";
+  (d.AD_nombre || []).forEach((_, i) => agregarAsistente({
+    nombre: d.AD_nombre[i],
+    dependencia: d.AD_dependencia_empresa[i],
+    aprueba: d.AD_aprueba[i],
+    observacion: d.AD_observaciones[i],
+    firma: d.AD_firma_ParticipacionVirtual[i]
+  }));
+  mostrar("Borrador cargado.");
+}
+
+// ---------- Enviar al servidor ----------
+async function enviar(evento) {
+  evento.preventDefault();
+  const datos = recolectarSinAnexos();
+  const error = validar(datos);
+  if (error) { mostrar(error); return; }
+
+  try {
+    const archivos = [...document.getElementById("anexos").files];
+    datos.anexos = await Promise.all(archivos.map(leerArchivo));
+
+    mostrar("Enviando...");
+    const resp = await fetch(URL_ENVIO, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos)
     });
-  });
+    const resultado = await resp.json();
+    if (!resp.ok) throw new Error(resultado.error || "Error del servidor");
+
+    mostrar("Acta enviada correctamente. ID: " + resultado.id);
+    mostrarDescargas(resultado);
+    localStorage.removeItem(CLAVE_BORRADOR);
+  } catch (e) {
+    mostrar("No se pudo enviar: " + e.message);
+  }
+}
+
+// ---------- Descargas ----------
+function mostrarDescargas(resultado) {
+  const cont = document.getElementById("descargas");
+  cont.innerHTML = "";
+
+  const pPdf = document.createElement("p");
+  const aPdf = document.createElement("a");
+  aPdf.href = "/api/actas/" + resultado.id + "/pdf";
+  aPdf.textContent = "Descargar acta en PDF";
+  aPdf.setAttribute("download", "acta_" + resultado.id + ".pdf");
+  pPdf.appendChild(aPdf);
+  cont.appendChild(pPdf);
+
+  if (resultado.anexos && resultado.anexos.length > 0) {
+    const titulo = document.createElement("p");
+    titulo.textContent = "Anexos:";
+    cont.appendChild(titulo);
+    const ul = document.createElement("ul");
+    resultado.anexos.forEach(a => {
+      const li = document.createElement("li");
+      const link = document.createElement("a");
+      link.href = "/api/actas/" + resultado.id + "/anexos/" + a.id;
+      link.textContent = a.nombre;
+      link.setAttribute("download", a.nombre);
+      li.appendChild(link);
+      ul.appendChild(li);
+    });
+    cont.appendChild(ul);
+  }
+}
+
+// ---------- Eventos ----------
+document.getElementById("btnAddCompromiso").onclick = () => agregarCompromiso();
+document.getElementById("btnAddAsistente").onclick = () => agregarAsistente();
+document.getElementById("btnGuardar").onclick = guardarBorrador;
+document.getElementById("btnCargar").onclick = cargarBorrador;
+document.getElementById("formActa").addEventListener("submit", enviar);
+
+// Una fila inicial en cada tabla
+agregarCompromiso();
+agregarAsistente();
 </script>
-{% endblock %}
+</body>
+</html>

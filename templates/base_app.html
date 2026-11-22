@@ -29,7 +29,7 @@
       <nav class="menu" aria-label="Principal">
         <a href="{{ url_for('inicio') }}" class="{{ 'activo' if menu_activo == 'inicio' }}">{{ icono('home') }} Inicio</a>
         {% if puede_crear_acta %}
-        <a href="{{ url_for('actas.crear') }}" class="{{ 'activo' if menu_activo == 'crear' }}">{{ icono('file-plus') }} Crear acta</a>
+        <a href="{{ url_for('crear_acta') }}" class="{{ 'activo' if menu_activo == 'crear' }}">{{ icono('file-plus') }} Crear acta</a>
         {% endif %}
         <a href="{{ url_for('mis_actas') }}" class="{{ 'activo' if menu_activo == 'mis_actas' }}">{{ icono('folder') }} Mis actas</a>
         <a href="{{ url_for('asistentes') }}" class="{{ 'activo' if menu_activo == 'asistentes' }}">{{ icono('users') }} Asistentes</a>
