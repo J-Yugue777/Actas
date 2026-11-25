@@ -1,95 +1,135 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Acta GOR-F084 V2</title>
-</head>
-<body>
+{% extends 'base_app.html' %}
+{% set menu_activo = 'crear' %}
+{% block titulo %}Crear acta | Actas SENA{% endblock %}
+
+{% block contenido %}
+<a href="{{ url_for('inicio') }}" class="btn-sec btn-volver" id="btnVolver">&larr; Volver</a>
 <h1>Acta de reunión GOR-F084 V2</h1>
+<p class="sub">Completa los datos de la reunión, agrega los compromisos y los asistentes, y envía el acta para generar el PDF.</p>
 
-<form id="formActa">
+<form id="formActa" class="acta-form">
 
-  <p><label>Nombre del comité o de la reunión:<br>
-    <input type="text" id="nombre_comite" required></label></p>
+  <section class="panel">
+    <header class="panel-cab"><h2>Datos de la reunión</h2></header>
+    <div class="rejilla">
+      <div class="campo completo">
+        <label for="nombre_comite">Nombre del comité o de la reunión</label>
+        <input type="text" id="nombre_comite" required>
+      </div>
+      <div class="campo">
+        <label for="ciudad">Ciudad</label>
+        <input type="text" id="ciudad" required>
+      </div>
+      <div class="campo">
+        <label for="fecha">Fecha</label>
+        <input type="date" id="fecha" required>
+      </div>
+      <div class="campo">
+        <label for="hora_inicio">Hora inicio</label>
+        <input type="time" id="hora_inicio" required>
+      </div>
+      <div class="campo">
+        <label for="hora_fin">Hora fin</label>
+        <input type="time" id="hora_fin" required>
+      </div>
+      <div class="campo">
+        <label for="lugar_enlace">Lugar y/o enlace</label>
+        <input type="text" id="lugar_enlace" required>
+      </div>
+      <div class="campo">
+        <label for="direccion_regional">Dirección regional centro</label>
+        <input type="text" id="direccion_regional" required>
+      </div>
+    </div>
+  </section>
 
-  <p><label>Ciudad:<br>
-    <input type="text" id="ciudad" required></label></p>
+  <section class="panel">
+    <header class="panel-cab"><h2>Desarrollo del acta</h2></header>
+    <div class="rejilla">
+      <div class="campo completo">
+        <label for="agenda">Agenda o puntos para desarrollar</label>
+        <textarea id="agenda" rows="4"></textarea>
+      </div>
+      <div class="campo completo">
+        <label for="objetivos_de_reunion">Objetivos de la reunión</label>
+        <textarea id="objetivos_de_reunion" rows="4"></textarea>
+      </div>
+      <div class="campo completo">
+        <label for="desarrollo">Desarrollo de la reunión</label>
+        <textarea id="desarrollo" rows="6"></textarea>
+      </div>
+      <div class="campo completo">
+        <label for="conclusiones">Conclusiones</label>
+        <textarea id="conclusiones" rows="4"></textarea>
+      </div>
+    </div>
+  </section>
 
-  <p><label>Fecha:<br>
-    <input type="date" id="fecha" required></label></p>
+  <section class="panel lista-dinamica">
+    <header class="panel-cab"><h2>Compromisos</h2></header>
+    <div class="tabla-scroll">
+      <table id="tablaCompromisos">
+        <thead>
+          <tr>
+            <th>Actividad / decisión</th>
+            <th>Fecha</th>
+            <th>Responsable</th>
+            <th>Firma o participación virtual</th>
+            <th>Quitar</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button type="button" class="agregar" id="btnAddCompromiso">+ Agregar compromiso</button>
+  </section>
 
-  <p><label>Hora inicio:<br>
-    <input type="time" id="hora_inicio" required></label></p>
+  <section class="panel lista-dinamica">
+    <header class="panel-cab"><h2>Asistentes y aprobación de decisiones</h2></header>
+    <div class="tabla-scroll">
+      <table id="tablaAsistentes">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Dependencia / empresa</th>
+            <th>Aprueba</th>
+            <th>Observación</th>
+            <th>Firma o participación virtual</th>
+            <th>Quitar</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button type="button" class="agregar" id="btnAddAsistente">+ Agregar asistente</button>
+  </section>
 
-  <p><label>Hora fin:<br>
-    <input type="time" id="hora_fin" required></label></p>
+  <section class="panel">
+    <header class="panel-cab"><h2>Anexos</h2></header>
+    <div class="campo">
+      <label for="anexos">Capturas de pantalla (imágenes)</label>
+      <input type="file" id="anexos" accept="image/*" multiple>
+    </div>
+  </section>
 
-  <p><label>Lugar y/o enlace:<br>
-    <input type="text" id="lugar_enlace" required></label></p>
-
-  <p><label>Dirección regional centro:<br>
-    <input type="text" id="direccion_regional" required></label></p>
-
-  <p><label>Agenda o puntos para desarrollar:<br>
-    <textarea id="agenda" rows="4" cols="60"></textarea></label></p>
-
-  <p><label>Objetivos de la reunión:<br>
-    <textarea id="objetivos_de_reunion" rows="4" cols="60"></textarea></label></p>
-
-  <p><label>Desarrollo de la reunión:<br>
-    <textarea id="desarrollo" rows="6" cols="60"></textarea></label></p>
-
-  <p><label>Conclusiones:<br>
-    <textarea id="conclusiones" rows="4" cols="60"></textarea></label></p>
-
-  <h2>Compromisos</h2>
-  <table border="1" id="tablaCompromisos">
-    <thead>
-      <tr>
-        <th>Actividad / decisión</th>
-        <th>Fecha</th>
-        <th>Responsable</th>
-        <th>Firma o participación virtual</th>
-        <th>Quitar</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-  <p><button type="button" id="btnAddCompromiso">Agregar compromiso</button></p>
-
-  <h2>Asistentes y aprobación de decisiones</h2>
-  <table border="1" id="tablaAsistentes">
-    <thead>
-      <tr>
-        <th>Nombre</th>
-        <th>Dependencia / empresa</th>
-        <th>Aprueba</th>
-        <th>Observación</th>
-        <th>Firma o participación virtual</th>
-        <th>Quitar</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-  <p><button type="button" id="btnAddAsistente">Agregar asistente</button></p>
-
-  <h2>Anexos</h2>
-  <p><label>Capturas de pantalla (imágenes):<br>
-    <input type="file" id="anexos" accept="image/*" multiple></label></p>
-
-  <p>
-    <button type="button" id="btnGuardar">Guardar borrador</button>
-    <button type="button" id="btnCargar">Cargar borrador</button>
-    <button type="submit" id="btnEnviar">Enviar</button>
-  </p>
-  <p id="mensaje"></p>
+  <div class="acciones">
+    <button type="submit" class="btn-primario" id="btnEnviar">Enviar</button>
+    <button type="button" class="btn-sec" id="btnGuardar">Guardar borrador</button>
+    <button type="button" class="btn-sec" id="btnCargar">Cargar borrador</button>
+    <a href="{{ url_for('inicio') }}" class="btn-sec btn-volver">&larr; Volver</a>
+  </div>
+  <p id="mensaje" role="status"></p>
 </form>
 
-<h2>Descargas</h2>
-<div id="descargas">
-  <p>Cuando envíes el acta, aquí aparecerán el PDF y los anexos para descargar.</p>
-</div>
+<section class="panel" style="margin-top:1.25rem">
+  <header class="panel-cab"><h2>Descargas</h2></header>
+  <div id="descargas">
+    <p class="sub">Cuando envíes el acta, aquí aparecerán el PDF y los anexos para descargar.</p>
+  </div>
+</section>
+{% endblock %}
 
+{% block scripts %}
 <script>
 const CLAVE_BORRADOR = "acta_gorf084_v2_borrador";
 const URL_ENVIO = "/api/actas";
@@ -332,11 +372,17 @@ document.getElementById("btnAddCompromiso").onclick = () => agregarCompromiso();
 document.getElementById("btnAddAsistente").onclick = () => agregarAsistente();
 document.getElementById("btnGuardar").onclick = guardarBorrador;
 document.getElementById("btnCargar").onclick = cargarBorrador;
+// Botón Volver: vuelve a la página anterior (si viene de la app); si no, va al inicio
+document.querySelectorAll(".btn-volver").forEach(b => b.addEventListener("click", ev => {
+  if (document.referrer.startsWith(location.origin) && history.length > 1) {
+    ev.preventDefault();
+    history.back();
+  }
+}));
 document.getElementById("formActa").addEventListener("submit", enviar);
 
 // Una fila inicial en cada tabla
 agregarCompromiso();
 agregarAsistente();
 </script>
-</body>
-</html>
+{% endblock %}

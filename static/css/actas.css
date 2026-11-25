@@ -136,7 +136,9 @@
 }
 
 .btn-sec:hover { background: var(--verde-claro); border-color: var(--verde-sena); }
-
+/* Botón Volver */
+.btn-volver { padding: 0.55rem 1.1rem; }
+#btnVolver { margin-bottom: 1rem; }
 /* Mensajes */
 .alerta-lista { margin-top: 1.25rem; }
 .alerta-lista ul { margin: 0.4rem 0 0; padding-left: 1.2rem; list-style: disc; }
@@ -257,3 +259,31 @@
 .firma-img { max-height: 48px; max-width: 140px; background: #fff; border: 1px solid #dfe8e2; border-radius: 6px; padding: 2px; }
 .firma-grande { max-height: 110px; max-width: 280px; margin-bottom: 0.8rem; }
 .acta-form textarea, .adjuntar textarea { width: 100%; font: inherit; padding: 0.6rem 0.8rem; border: 1.5px solid #c9d6ce; border-radius: 8px; resize: vertical; }
+
+
+/* ---- Formulario GOR-F084 V2 (acta.html) ---- */
+.acta-form .panel { margin: 0; }
+.lista-dinamica table input { min-width: 9rem; }
+.lista-dinamica table select {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--texto);
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+}
+.lista-dinamica table td { padding: 0.4rem 0.35rem; }
+.lista-dinamica table .quitar { height: 2.5rem; }
+.campo input[type="file"] { padding: 0.6rem; background: #f6f9f7; border-style: dashed; }
+#mensaje:not(:empty) {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--azul-titulo);
+  background: #f6f9f7;
+  border-left: 4px solid var(--verde-sena);
+  border-radius: 8px;
+}
+@media (max-width: 700px) { .rejilla { grid-template-columns: 1fr; } }
