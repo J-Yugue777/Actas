@@ -1,0 +1,42 @@
+{% extends 'base_app.html' %}
+{% from '_iconos.html' import icono %}
+{% set menu_activo = 'mis_actas' %}
+{% block titulo %}Mis actas | Actas SENA{% endblock %}
+
+{% block contenido %}
+<h1>Mis actas</h1>
+<p class="sub">Actas que has creado.</p>
+
+<form class="barra-filtros" method="get" action="{{ url_for('mis_actas') }}">
+  <div class="campo buscador">
+    <label for="q" class="sr-only">Buscar</label>
+    <input type="search" id="q" name="q" value="{{ q }}" placeholder="Buscar por comité o ciudad">
+  </div>
+  <button type="submit" class="btn-sec btn-filtrar">Buscar</button>
+</form>
+
+<section class="panel">
+  <header class="panel-cab"><h2>Listado de actas</h2></header>
+  {% if actas %}
+  <div class="tabla-scroll">
+    <table>
+      <thead><tr><th>N.º</th><th>Comité o reunión</th><th>Ciudad</th><th>Fecha</th><th>Dirección regional</th><th>PDF</th></tr></thead>
+      <tbody>
+        {% for a in actas %}
+        <tr>
+          <td class="fuerte">{{ a.id }}</td>
+          <td class="fuerte">{{ a.nombre_comite }}</td>
+          <td>{{ a.ciudad or '—' }}</td>
+          <td>{{ a.fecha.strftime('%d/%m/%Y') if a.fecha else '—' }}</td>
+          <td>{{ a.direccion_regional or '—' }}</td>
+          <td><a href="{{ url_for('actas.descargar_pdf', acta_id=a.id) }}">Descargar</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="vacio"><p class="fuerte">Aún no hay actas.</p><p class="sub">Aparecerán aquí cuando crees una.</p></div>
+  {% endif %}
+</section>
+{% endblock %}
