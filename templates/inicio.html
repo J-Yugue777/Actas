@@ -1,29 +1,6 @@
 {% extends 'base_app.html' %}
 {% from '_iconos.html' import icono %}
-{#
-  DATOS DE EJEMPLO: las tarjetas, la tabla de actas y los compromisos son de muestra
-  hasta que existan las tablas de actas en la base de datos. Solo nombre y rol
-  vienen de la sesión.
-#}
 {% set menu_activo = 'inicio' %}
-{% set resumen = [
-  {'titulo': 'Total de actas', 'valor': 12, 'icono': 'file-text', 'color': 'verde'},
-  {'titulo': 'En revisión',    'valor': 3,  'icono': 'eye',        'color': 'azul'},
-  {'titulo': 'Aprobadas',      'valor': 8,  'icono': 'check-circle','color': 'verde'},
-  {'titulo': 'Rechazadas',     'valor': 1,  'icono': 'x-circle',   'color': 'rojo'}
-] %}
-{% set actas = [
-  {'num': '024', 'fecha': '10/05/2024', 'programa': 'Tecnólogo en Análisis y Desarrollo de Software', 'ficha': '2876540', 'estado': 'Aprobada',    'clase': 'verde'},
-  {'num': '023', 'fecha': '08/05/2024', 'programa': 'Técnico en Gestión Administrativa',              'ficha': '2876539', 'estado': 'En revisión', 'clase': 'azul'},
-  {'num': '022', 'fecha': '06/05/2024', 'programa': 'Tecnólogo en Gestión Logística',                 'ficha': '2876538', 'estado': 'Aprobada',    'clase': 'verde'},
-  {'num': '021', 'fecha': '03/05/2024', 'programa': 'Técnico en Sistemas',                            'ficha': '2876537', 'estado': 'Aprobada',    'clase': 'verde'},
-  {'num': '020', 'fecha': '30/04/2024', 'programa': 'Tecnólogo en Gestión Empresarial',               'ficha': '2876536', 'estado': 'Rechazada',   'clase': 'rojo'}
-] %}
-{% set compromisos = [
-  {'titulo': 'Entregar informe final',  'fecha': '15/05/2024', 'estado': 'Pendiente',  'clase': 'amarillo', 'icono': 'clock',     'color': 'amarillo'},
-  {'titulo': 'Revisar documento',       'fecha': '18/05/2024', 'estado': 'Completado', 'clase': 'verde',    'icono': 'file-text', 'color': 'azul'},
-  {'titulo': 'Presentación de resultados','fecha': '22/05/2024','estado': 'Pendiente', 'clase': 'amarillo', 'icono': 'chart',     'color': 'morado'}
-] %}
 {% block titulo %}Inicio | Actas SENA{% endblock %}
 
 {% block contenido %}
@@ -75,8 +52,10 @@
             <td class="fuerte">{{ a.fecha }}</td>
             <td class="fuerte">{{ a.programa }}</td>
             <td class="fuerte">{{ a.ficha }}</td>
-            <td><span class="insignia {{ a.clase }}">{{ a.estado }}</span></td>
+            <td><span class="insignia {{ a.clase }}">{{ a.estado_texto }}</span></td>
           </tr>
+          {% else %}
+          <tr><td colspan="5" class="sub">Todavía no has creado actas.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -98,6 +77,8 @@
         </div>
         <span class="insignia {{ c.clase }}">{{ c.estado }}</span>
       </li>
+      {% else %}
+      <li><div class="compromiso-texto"><p class="fuerte">No tienes próximos compromisos pendientes.</p><p class="fecha">Cuando registres compromisos, aparecerán aquí.</p></div></li>
       {% endfor %}
     </ul>
     <a class="panel-pie" href="{{ url_for('compromisos') }}">Ver todos &gt;</a>

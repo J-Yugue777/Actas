@@ -7,7 +7,7 @@ from werkzeug.security import check_password_hash
 
 from actas import actas_bp
 from seguridad import creacion_requerida, login_requerido
-from db import buscar_usuario_por_correo
+from db import buscar_usuario_por_correo, transaccion
 import secciones
 
 load_dotenv()
@@ -74,8 +74,118 @@ def login():
 @app.route("/inicio")
 @login_requerido
 def inicio():
-    return render_template("inicio.html", nombre=session["nombre"], rol=session["rol"])
+    """Panel conectado al esquema legado real: actas.creado_por y compromisos JSONB."""
+    from datetime import date, datetime
 
+    usuario_id = session["usuario_id"]
+    try:
+        with transaccion() as cur:
+            cur.execute(
+                "SELECT tipo_vinculacion FROM public.usuarios WHERE id = %s AND activo = TRUE",
+                (usuario_id,),
+            )
+            usuario = cur.fetchone() or {}
+
+            # Esta instalación almacena el creador en creado_por, no en lider_id.
+            cur.execute(
+                """
+                SELECT COUNT(*) AS total,
+                       COUNT(*) FILTER (WHERE LOWER(COALESCE(estado, '')) = 'abierta') AS abiertas,
+                       COUNT(*) FILTER (WHERE LOWER(COALESCE(estado, '')) = 'cerrada') AS cerradas
+                FROM public.actas
+                WHERE creado_por = %s
+                """,
+                (usuario_id,),
+            )
+            resumen_bd = cur.fetchone()
+
+            # Últimas actas: en este esquema no existen numero_acta, ficha_id ni fecha_reunion.
+            cur.execute(
+                """
+                SELECT id, nombre_comite, fecha, ciudad, estado
+                FROM public.actas
+                WHERE creado_por = %s
+                ORDER BY fecha DESC NULLS LAST, id DESC
+                LIMIT 5
+                """,
+                (usuario_id,),
+            )
+            ultimas_actas = cur.fetchall()
+
+            # Los compromisos están guardados dentro de actas.compromisos (JSONB).
+            cur.execute(
+                """
+                SELECT a.id AS acta_id,
+                       c->>'actividad' AS actividad,
+                       NULLIF(BTRIM(c->>'fecha'), '') AS fecha,
+                       NULLIF(BTRIM(c->>'responsable'), '') AS responsable
+                FROM public.actas AS a
+                CROSS JOIN LATERAL jsonb_array_elements(
+                    CASE
+                        WHEN jsonb_typeof(a.compromisos) = 'array' THEN a.compromisos
+                        ELSE '[]'::jsonb
+                    END
+                ) AS c
+                WHERE a.creado_por = %s
+                  AND NULLIF(BTRIM(c->>'actividad'), '') IS NOT NULL
+                """,
+                (usuario_id,),
+            )
+            filas_compromisos = cur.fetchall()
+
+    except (psycopg2.Error, UnicodeDecodeError):
+        app.logger.exception("No se pudieron cargar los datos del panel de inicio")
+        return "No fue posible cargar el panel. Revisa la conexión y las columnas de PostgreSQL.", 503
+
+    resumen = [
+        {"titulo": "Total de actas", "valor": resumen_bd["total"], "icono": "file-text", "color": "verde"},
+        {"titulo": "Actas abiertas", "valor": resumen_bd["abiertas"], "icono": "eye", "color": "azul"},
+        {"titulo": "Actas cerradas", "valor": resumen_bd["cerradas"], "icono": "check-circle", "color": "verde"},
+        {"titulo": "Compromisos registrados", "valor": len(filas_compromisos), "icono": "clock", "color": "rojo"},
+    ]
+
+    for acta in ultimas_actas:
+        acta["num"] = str(acta["id"]).zfill(3)
+        acta["fecha"] = acta["fecha"].strftime("%d/%m/%Y") if acta["fecha"] else "—"
+        acta["programa"] = acta["nombre_comite"] or "Sin nombre"
+        acta["ficha"] = "—"
+        estado = (acta["estado"] or "abierta").strip().lower()
+        acta["clase"] = "verde" if estado == "cerrada" else "azul"
+        acta["estado_texto"] = estado.capitalize()
+
+    # El JSONB actual no tiene campo completado. Por eso no se etiqueta como
+    # completado/pending algo que la base no permite distinguir: se muestran
+    # los compromisos con fecha futura como próximos.
+    hoy = date.today()
+    proximos_compromisos = []
+    for fila in filas_compromisos:
+        fecha_texto = fila["fecha"]
+        try:
+            fecha_obj = date.fromisoformat(fecha_texto) if fecha_texto else None
+        except (TypeError, ValueError):
+            fecha_obj = None
+        if fecha_obj and fecha_obj >= hoy:
+            proximos_compromisos.append({
+                "titulo": fila["actividad"],
+                "fecha": fecha_obj.strftime("%d/%m/%Y"),
+                "estado": "Próximo",
+                "clase": "amarillo",
+                "color": "amarillo",
+                "icono": "clock",
+                "responsable": fila["responsable"] or "Sin asignar",
+            })
+    proximos_compromisos.sort(key=lambda c: datetime.strptime(c["fecha"], "%d/%m/%Y"))
+    proximos_compromisos = proximos_compromisos[:3]
+
+    return render_template(
+        "inicio.html",
+        nombre=session["nombre"],
+        rol=session["rol"],
+        tipo_vinculacion=usuario.get("tipo_vinculacion"),
+        resumen=resumen,
+        actas=ultimas_actas,
+        compromisos=proximos_compromisos,
+    )
 
 @app.route("/actas/nueva")
 @creacion_requerida
